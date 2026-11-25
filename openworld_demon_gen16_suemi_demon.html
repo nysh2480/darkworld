@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>OPEN WORLD PROTO gen16 + SWORD + SHIELD + DEMON</title>
+<style>
+.base{background-color:#000;color:#ccf;user-select:none;-webkit-user-select:none;margin:0;padding:0;font-family:monospace;touch-action:manipulation;overflow:hidden}
+.unit{background-color:#000;color:#ccf;border:solid 1px #ccf;user-select:none;-webkit-user-select:none;margin:2px;padding:2px;font-family:monospace}
+button.unit{font-size:14px}
+#stage{position:fixed;left:0;top:0;display:flex;justify-content:center;align-items:center;overflow:hidden}
+#guiViewport{position:relative;flex:0 0 auto}
+#v{display:block;border:0;outline:solid 1px #666666;image-rendering:pixelated;margin:0;padding:0}
+.pad{touch-action:none}
+.nopad .pad{display:none}
+.pad .grid{display:grid;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(3,48px)}
+.pad button{margin:2px;padding:0;width:44px;height:44px;font-size:16px;opacity:.8;touch-action:none}
+#stage.over .pad{position:absolute;bottom:4px;z-index:2;opacity:.45}
+#stage.over #padL{left:4px}#stage.over #padR{right:4px}
+#boss{display:none;position:absolute;left:6px;top:4px;width:36%;box-sizing:border-box;margin:0;padding:2px 4px;opacity:.92;font-size:12px;pointer-events:none}
+#hud{display:none;position:absolute;left:6px;top:34px;margin:0;padding:1px 6px;opacity:.85;font-size:12px;line-height:1.25;white-space:pre;pointer-events:none}
+#cmp{background:none;border:0;position:absolute;left:50%;top:4px;transform:translateX(-50%);margin:0;padding:1px 6px;opacity:.9;font-family:monospace;font-size:12px;line-height:1.1;white-space:pre;text-align:left;pointer-events:none}
+#mm{display:none;position:absolute;right:6px;top:34px;width:96px;height:96px;margin:0;padding:0;border:0;outline:solid 1px #666666;opacity:.9;image-rendering:pixelated;pointer-events:none}
+#dlg{display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:5;margin:0;padding:8px;min-width:270px;opacity:.97;font-size:14px}
+#dlg label{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:3px 0}
+#dlg input{width:170px;font-size:16px;margin:0}
+#dMsg{min-height:16px;font-size:12px;color:#fa8}
+#menuBtn{position:absolute;right:4px;top:4px;margin:0;padding:1px 8px;opacity:.7;z-index:3}
+#menu{display:none;position:absolute;left:6px;right:6px;bottom:6px;z-index:3;margin:0;padding:4px;opacity:.96}
+</style></head>
+<body class="base">
+<div id="stage" class="out">
+<div class="pad" id="padL"><div class="grid">
+<span></span><button class="unit" data-key="ArrowUp">&#9650;</button><span></span>
+<button class="unit" data-key="ArrowLeft">&#9664;</button><span></span><button class="unit" data-key="ArrowRight">&#9654;</button>
+<span></span><button class="unit" data-key="ArrowDown">&#9660;</button><span></span>
+</div></div>
+<div id="guiViewport">
+<canvas id="v" width="360" height="240"></canvas>
+<div class="unit" id="boss"><div><span id="bossT"></span></div><div style="height:6px;background:#333;margin-top:2px"><div id="bossF" style="height:100%;width:100%"></div></div></div>
+<div class="unit" id="hud"></div>
+<div class="unit" id="cmp"></div>
+<canvas id="mm" width="64" height="64"></canvas>
+<div class="unit" id="dlg"><div style="margin-bottom:4px">LOCATE</div>
+<label>SEED <input id="dSeed" class="unit" type="text" inputmode="numeric" autocomplete="off"></label>
+
+<label>CHUNK X <input id="dCX" class="unit" type="text" autocomplete="off"></label>
+<label>CHUNK Y <input id="dCY" class="unit" type="text" autocomplete="off"></label>
+<label>X <input id="dX" class="unit" type="text" autocomplete="off"></label>
+<label>Y <input id="dY" class="unit" type="text" autocomplete="off"></label>
+<div id="dMsg"></div><button class="unit" id="dGo">MOVE</button><button class="unit" id="dCancel">CANCEL</button></div>
+<button class="unit" id="menuBtn">&#9776;</button>
+<div class="unit" id="menu">
+<div style="display:flex;flex-wrap:wrap;gap:4px">
+<button class="unit" data-act="vm">VIEW-</button><button class="unit" data-act="vp">VIEW+</button>
+<button class="unit" data-act="loc">LOCATE</button><button class="unit" data-act="map">MAP</button>
+<button class="unit" data-act="obj">OBJ</button><button class="unit" data-act="grass">GRASS</button>
+<button class="unit" data-act="snd">SOUND</button><button class="unit" data-act="asp">ASPECT</button><button class="unit" data-act="hpm">HPBAR</button><button class="unit" data-act="pad">PAD</button><button class="unit" data-act="hud">DEBUG</button></div>
+<div style="padding:4px 2px 0;line-height:1.5;font-size:12px">W/&uarr; 前進　S/&darr; 後退　A/&larr; 左旋回　D/&rarr; 右旋回　Space/I 剣　B/Shift 盾ガード(正面のみ被ダメ80%減・移動遅くなる)　K ポーション　J/L 横移動　(焚き火は近づくと燃える)<br>1-5 LOCATE　[ ] 視程　M マップ　O 描画方式　G 草　N 音　H デバッグ表示　P 十字キー表示</div>
+</div>
+</div>
+<div class="pad" id="padR"><div class="grid">
+<span></span><button class="unit" data-key="KeyI">&#9876;</button><span></span>
+<button class="unit" data-key="KeyJ">&#9665;</button><button class="unit" data-key="KeyB">盾</button><button class="unit" data-key="KeyL">&#9655;</button>
+<span></span><button class="unit" data-key="KeyK">&#9829;</button><span></span>
+</div></div>
+</div>
+<script>
+'use strict';
+/* ===== world contract (do not change without bumping GEN_VERSION) ===== */
+const GEN_VERSION=16, CH=32, RANK='DWSGFCM';
+let SEED=123456, R0=400, RR=2500;
+const ENVT=4, ENVREC=3; // no heat / cold damage any more; only slow recovery: ENVREC hp every ENVT seconds
+/* ALTITUDE decides the terrain: the height 0..255 is cut into 8 fixed bands (4 classes x 2): 0 deep sea, 1 shallows | 2 sand, 3 lowland grass | 4 highland grass, 5 highland wasteland | 6 mountain wasteland, 7 snowfield.
+   There is no biome word / letter array any more. Letters: D W S G R M (T is no longer produced). */
+const sm=t=>{t=t<0?0:t>1?1:t;return t*t*(3-2*t);};
+/* ===== world hierarchy: WORLD SEED -> SECTION seed -> chunk-level random numbers inside the section =====
+   A section = 2^25 x 2^25 chunks (2^31 x 2^31 cells). Section seed = hash(world seed, section x, section y). Inside a section every cell / lattice point is hashed from its
+   in-section int32 coordinates, so no value needs more than 32 bits, and the pattern differs from section to section (no repetition).
+   A lattice point that falls over a section border is carried into the neighbouring section, so interpolation stays continuous across borders.
+   Position = origin chunk (OX,OY: f64 integers, exact up to 2^53) * 64 + local cell (small ints around the player; floating origin). */
+const SECN=2147483648,SECC=67108864; // section = 2^25 chunks
+const WC=2251799813685248,HC=1125899906842624,SW=33554432,SH=16777216; // the world is closed: chunk coordinates live in [-2^50, 2^50) and wrap (2^51 chunks = 2^26 sections per axis)
+const wrapC=c=>c-Math.floor((c+HC)/WC)*WC; // exact in f64 (|c| < 2^53)
+let OX=0,OY=0,FX=0,FY=0,FU=0,FQ=0,FSX=0,FSY=0,SSX=NaN,SSY=NaN,SSV=0;
+function setFrame(x,y){x|=0;y|=0;const cx=wrapC(OX+(x>>5)),cy=wrapC(OY+(y>>5)),sx=Math.floor(cx/SECC),sy=Math.floor(cy/SECC); // frame = the cell (x,y): its section and in-section coordinates
+ FX=x;FY=y;FSX=sx;FSY=sy;FU=(cx-sx*SECC)*32+(x&31);FQ=(cy-sy*SECC)*32+(y&31);}
+function secSeed(sx,sy){if(sx===SSX&&sy===SSY)return SSV;let h=Math.imul(SEED|0,0x9e3779b1)^Math.imul(sx|0,0x85ebca6b)^Math.imul(sy|0,0xc2b2ae35);h^=h>>>15;h=Math.imul(h,0x2c1b3c6d);h^=h>>>12;h=Math.imul(h,0x297a2d39);h^=h>>>15;SSX=sx;SSY=sy;SSV=h;return h;}
+function hcore(sx,sy,a,b,s){let h=Math.imul(a|0,0x27d4eb2d)^Math.imul(b|0,0x165667b1)^Math.imul(s|0,0x9e3779b1)^secSeed(sx,sy);h^=h>>>15;h=Math.imul(h,0x85ebca6b);h^=h>>>13;h=Math.imul(h,0xc2b2ae35);h^=h>>>16;return h>>>24;} // 0..255
+function hsh(a,b,s){let u=FU+(a-FX),v=FQ+(b-FY),sx=FSX,sy=FSY; // cell-level hash, a/b = local cells near the frame cell
+ if(u<0){u+=SECN;sx--;}else if(u>=SECN){u-=SECN;sx++;}if(v<0){v+=SECN;sy--;}else if(v>=SECN){v-=SECN;sy++;}
+ if(sx>=SH)sx-=SW;else if(sx<-SH)sx+=SW;if(sy>=SH)sy-=SW;else if(sy<-SH)sy+=SW;return hcore(sx,sy,u,v,s);}
+function hlat(k,gx,gy,s){const M=1<<(31-k);let sx=FSX,sy=FSY; // lattice-point hash (lattice every 2^k cells), carried over section borders
+ if(gx<0){gx+=M;sx--;}else if(gx>=M){gx-=M;sx++;}if(gy<0){gy+=M;sy--;}else if(gy>=M){gy-=M;sy++;}
+ if(sx>=SH)sx-=SW;else if(sx<-SH)sx+=SW;if(sy>=SH)sy-=SW;else if(sy<-SH)sy+=SW;return hcore(sx,sy,gx,gy,s+(k<<8));}
+function vn(x,y,k,s){const hf=1<<(k-1),sz=1<<k,u=FU+(x-FX)-hf,v=FQ+(y-FY)-hf,gx=Math.floor(u/sz),gy=Math.floor(v/sz),tx=((u-gx*sz)<<6)>>k,ty=((v-gy*sz)<<6)>>k; // lattice every 2^k cells (k=6: chunk centres)
+ const sx=(tx*tx*(192-2*tx))>>12,sy=(ty*ty*(192-2*ty))>>12,a=hlat(k,gx,gy,s),b=hlat(k,gx+1,gy,s),c=hlat(k,gx,gy+1,s),d=hlat(k,gx+1,gy+1,s);
+ const t=a+(((b-a)*sx)>>6),w=c+(((d-c)*sx)>>6);return t+(((w-t)*sy)>>6);}
+/* climate 0..255 (128 = temperate): two very large noises (2^13 / 2^11 cells) + height (high = cold). NOT bound to x, y or the distance from the origin. */
+function clim(x,y,t){let n=(179*vn(x,y,13,1)+77*vn(x,y,11,2))>>8;n=Math.min(255,Math.max(0,128+(((n-128)*512)>>8)));return Math.min(255,Math.max(0,n-((t-128)>>2)));}
+const climateAt=(x,y)=>{const ix=Math.floor(x),iy=Math.floor(y);setFrame(ix,iy);return clim(ix,iy,heightT(ix,iy))/255;}; // float view for gameplay/sky only
+function genReset(){SSX=NaN;SSY=NaN;NCV.fill(255);RCV.fill(0);CCV.fill(0);} // origin / seed changed: drop every cache
+/* mountain caves: a lattice (every 16 cells) of jittered nodes joined by tunnels; edges exist with p=0.65 (> 0.5, so the network percolates and runs through the mountain). Integer only.
+   Geometry is computed relative to the lattice cell, so it is independent of the origin. */
+function segD(px,py,ax,ay,bx,by,r2){const dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy,ex=px-ax,ey=py-ay,dot=ex*dx+ey*dy; // is (px,py) within sqrt(r2) of the segment?
+ if(dot<=0)return ex*ex+ey*ey<=r2;if(dot>=l2){const fx=px-bx,fy=py-by;return fx*fx+fy*fy<=r2;}const cr=ex*dy-ey*dx;return cr*cr<=r2*l2;}
+/* ===== CLUMP FIELD: discrete blobs and voids that can never trap a route =====
+   One blob per lattice cell (2^k): present with probability pa/256, centre jittered, radius rn..rm. A present blob is a HUB (about 45 %) or a LEAF; a leaf may join ONE hub that lies west or north of it (probability pj/256) by a short bridge.
+   Each node has at most one parent and a parent is always a hub, so every cluster is a star (hub + up to 2 leaves) and the union of all blobs is a FOREST: it has no loop, so it can never enclose free space.
+   Blobs stay inside their own cell with a margin, so neighbouring clusters keep a gap of at least 2 cells: the free space is ONE connected region everywhere, with no sealed pockets.
+   Everything is hashed from lattice coordinates, so it is reproducible from the seed and needs no neighbourhood search. sh (0..2) only ERODES the shapes (never grows them), so topology is kept. */
+const isP=(k,a,b,s,pa)=>hlat(k,a,b,s)<pa,isH=(k,a,b,s,pa)=>hlat(k,a,b,s)<pa&&hlat(k,a,b,s+1)>=145; // present / hub
+function isPar(k,a,b,s,pa,pj){if(hlat(k,a,b,s)>=pa||hlat(k,a,b,s+1)<145||hlat(k,a,b,s+2)>=pj)return 0; // 0 none, 1 west hub, 2 north hub (leaf only)
+ const w=isH(k,a-1,b,s,pa),n=isH(k,a,b-1,s,pa);return w&&n?((hlat(k,a,b,s+3)&1)?1:2):w?1:n?2:0;}
+function clump(x,y,k,s,pa,pj,sh){const S=1<<k,rm=(S*3)>>3,rn=((rm*5)/6)|0,jr=S-2*rm-1,rb=((rn*rn)>>1)>>sh,
+ px=FU+(x-FX),py=FQ+(y-FY),gx=Math.floor(px/S),gy=Math.floor(py/S),qx=px-gx*S,qy=py-gy*S;
+ const cX=(a,b)=>rm+1+((hlat(k,a,b,s+4)*jr)>>8),cY=(a,b)=>rm+1+((hlat(k,a,b,s+5)*jr)>>8);
+ if(isP(k,gx,gy,s,pa)){const ax=cX(gx,gy),ay=cY(gx,gy),dx=qx-ax,dy=qy-ay,o=(dx>0?1:0)|(dy>0?2:0)|(Math.abs(dx)>Math.abs(dy)?4:0),
+   r=rn+((hlat(k,gx,gy,s+6)*(rm-rn+1))>>8)-sh-((hlat(k,gx,gy,s+8+o)>>7)&1); // each of the 8 octants of the blob is 0 or 1 cell smaller: a rough, star-shaped outline
+  if(r>0&&dx*dx+dy*dy<=r*r)return 1;
+  if(rb>0){const pr=isPar(k,gx,gy,s,pa,pj);if(pr===1&&segD(qx,qy,ax,ay,cX(gx-1,gy)-S,cY(gx-1,gy),rb))return 1;if(pr===2&&segD(qx,qy,ax,ay,cX(gx,gy-1),cY(gx,gy-1)-S,rb))return 1;}}
+ if(rb>0){if(isPar(k,gx+1,gy,s,pa,pj)===1&&segD(qx,qy,cX(gx,gy),cY(gx,gy),cX(gx+1,gy)+S,cY(gx+1,gy),rb))return 1; // bridges of the leaves east and south of this hub
+  if(isPar(k,gx,gy+1,s,pa,pj)===2&&segD(qx,qy,cX(gx,gy),cY(gx,gy),cX(gx,gy+1),cY(gx,gy+1)+S,rb))return 1;}
+ return 0;}
+const lavaMt=(px,py)=>hlat(9,Math.floor(px/512),Math.floor(py/512),60)>=140; // LAVA mountain (about 45 %) or plain CAVE mountain: decided per 512x512 square, which lines up with the clump lattice
+/* CAVE INTERIOR = 8x8 tile patterns (4x4 tiles make one 32x32 chunk). Every pattern keeps floor in the middle of all four edges (2 cells each), so any two neighbouring tiles connect and the whole cave is one network.
+   . floor  # rock mass  P pillar  ~ shallow liquid  O deep liquid. The pattern of a tile comes from the tile's lattice hash (lattice every 8 cells) through a weight table. */
+const TPAT=[
+ ["........","........","........","........","........","........","........","........"], // 0 open hall
+ ["##....##","##....##","........","........","........","........","##....##","##....##"], // 1 four corner blocks (cross-shaped passage)
+ ["........","........","..####..","..####..","..####..","..####..","........","........"], // 2 ring passage around a rock mass
+ ["........","........","..P..P..","........","........","..P..P..","........","........"], // 3 four pillars
+ ["........","........","........","...PP...","...PP...","........","........","........"], // 4 centre pillar block
+ ["........",".P..P...","........","........",".P..P...","........","........","........"], // 5 pillar lattice (3 cells)
+ ["........","........","..~~~~..","..~OO~..","..~OO~..","..~~~~..","........","........"], // 6 pool
+ ["##......","#.......","........","........","........","........",".......#","......##"], // 7 rocks top-left / bottom-right
+ ["......##",".......#","........","........","........","........","#.......","##......"], // 8 rocks top-right / bottom-left
+ ["###.....","###.....","###.....","........","........","....P...","........","........"]  // 9 big corner block + one pillar
+],TW_CAVE=[0,0,1,2,3,3,4,5,5,6,7,8,9,3,5,4],TW_LAVA=[0,0,0,0,1,2,6,6,6,6,7,8,9,3],TPC=TPAT.map(t=>t.map(r=>Array.from(r,c=>c==='.'?1:c==='#'?0:c==='P'?4:c==='~'?2:3)));
+function cave(x,y,a){ // 0 wall, 1 floor, 2 shallow liquid (walkable), 3 deep liquid (impassable), 4 pillar
+ const px=FU+(x-FX),py=FQ+(y-FY),tx=Math.floor(px/8),ty=Math.floor(py/8),lx=px-tx*8,ly=py-ty*8,tw=lavaMt(px,py)?TW_LAVA:TW_CAVE;
+ return TPC[tw[(hlat(3,tx,ty,101)*tw.length)>>8]][ly][lx];}
+function okLand(x,y){const l=ninfo(x,y)&7;return l>=2&&l<=5;}
+/* ENTRANCE GATE: in front of a cave entrance E (outward direction d) a roofed stone passage: floor on E+d and E+2d, stone walls on both sides. A third of the entrances get one. */
+let GD=0;
+function gateAt(x,y){ // is (x,y) a cell of an entrance gate? 0 none, 2 passage floor (roofed), 6 stone wall, 4 clearing at the exit (no objects). Two passes: a passage floor always wins over a neighbouring gate's wall, so no entrance is sealed
+ for(let pass=0;pass<2;pass++)for(let d=0;d<4;d++){const dx=NDX[d],dy=NDY[d];
+  for(let k=1;k<=3;k++)for(let s=-1;s<=1;s++){if((s===0)!==(pass===0)||(k===3&&s!==0))continue;const ex=x-dx*k+dy*s,ey=y-dy*k-dx*s; // cell = E + k*d + s*p, p = (-dy,dx)
+   if((ninfo(ex,ey)&7)!==6)continue;const hg=hsh(ex,ey,43)<96; // about a third of the doorways get a gate; a doorway in a flat wall (no natural pocket) always does
+   if(!okLand(ex+dx,ey+dy)||!okLand(ex+2*dx,ey+2*dy)||!okLand(ex+3*dx,ey+3*dy))continue; // 3 cells of dry open ground in front of the entrance
+   if(gateK(ex,ey,true)===1&&GD===d){if(!hg){let sc=0;for(let q=0;q<8;q++)if((ninfo(ex+dx+NDX[q],ey+dy+NDY[q])&7)===6)sc++;if(sc>=5)continue;}return k===3?4:pass===0?2:6;}}}
+ return 0;}
+const AREAC=c=>(c&7)===6||((c&7)<=4&&(c&192)===128&&!(c&8)); // INSIDE: a cave, or a roofed building floor (bit 7 without bit 6). Inside = ceiling texture, outside = sky
+let SC=0,SV=0,SO=0,FAST=false;
+/* cell code: bits0-2 letter (D W S G T R M), bit3 wall, bits4-5 special (1 ice, 2 lava), bit6 ENTRANCE, bit7 PILLAR (a wall cell inside a cave).
+   AREA: every mountain cell (letter M) belongs to the mountain AREA = "indoors": floor + ceiling. Everything else is outdoors (sky). */
+let TL=0,TSP=0,TOB=0,TC=0,TPOS=0,TIDXI=0;
+/* gen12 + v19 height field: region 98 % (lattice 2^15 cells = 32 regions), chunk 1 % (lattice 2^10 cells = 32 chunks), cell 1 % = the cell's own value LERPed with its 2x2 neighbours
+   (blend fractions hashed per cell, so the straight LERP borders get noise). Plain linear LERP, no smoothstep. Output 0..255. */
+function lerpK(x,y,k,sd){const sz=2**k,u=FU+(x-FX),v=FQ+(y-FY),gx=Math.floor(u/sz),gy=Math.floor(v/sz),tx=(u-gx*sz)/sz,ty=(v-gy*sz)/sz,
+ a=hlat(k,gx,gy,sd),b=hlat(k,gx+1,gy,sd),c=hlat(k,gx,gy+1,sd),d=hlat(k,gx+1,gy+1,sd),t=a+(b-a)*tx,w=c+(d-c)*tx;return t+(w-t)*ty;}
+function cell2(x,y){const a=hsh(x,y,31),b=hsh(x+1,y,31),c=hsh(x,y+1,31),d=hsh(x+1,y+1,31),u=hsh(x,y,33)/255,v=hsh(x,y,34)/255,t=a+(b-a)*u,w=c+(d-c)*u;return t+(w-t)*v;}
+function heightT(x,y){return Math.min(255,Math.max(0,Math.round(0.98*lerpK(x,y,10,11)+0.01*lerpK(x,y,5,21)+0.01*cell2(x,y))));}
+function terr(x,y){setFrame(x,y);const t=heightT(x,y),c=clim(x,y,t); // DEMON REALM. ALTITUDE 0..255 -> 4 classes x 2 halves = 8 terrains: swamp (deep, shallow) | wasteland (sand, dead grass) | forest (withered, conifer) | mountain (cave, lava cave)
+ const k=t>>6,s=(t>>5)&1; // k: class, s: lower (0) / upper (1) half of the class
+ const l=k<2?(k<<1)|s:k===2?4+s:6; // letter: D deep swamp, W shallow bog | S sand, G dead grass | F withered forest, C conifer forest | M mountain
+ const pos=l===6?48+(t&63)*16/64:0,idx=k>=2?1:0; // pos: height inside a mountain (48..64); idx 1 = forest or higher (cave entrances / gates may exist there)
+ let sp=0;if(l===1&&c<31)sp=1;else if(k===3&&s)sp=1; // cold shallows freeze; the upper mountain is covered with ice
+ let ob=0;if(!sp&&l>=2&&l<=5){const h=hsh(x,y,9),d=vn(x,y,4,10),gt=d>140?5:1; // objects: 1 grass, 2 shrub, 3 tree, 4 rock, 5 dense grass - trees and rocks stand in CLUMPS with open lanes between them
+  if(k===1)ob=s?(h<90+((120*d)>>8)?gt:h>=246?2:0):(clump(x,y,5,100,215,170,0)?(h>=120?4:h>=100?2:0):(h>=244?2:0)); // wasteland: dead grass and dry brush | sand with rock fields
+  else{const gv=clump(x,y,5,120,215,150,0); // forest: groves of trees, lighter wood between them
+   ob=h<(gv?(s?90:75):(s?34:20))?3:h<80+((100*d)>>8)?gt:h>=248?4:0;}} // withered (lower) and conifer (upper) forest
+ else if(!sp&&l<=1){const h=hsh(x,y,9);ob=l===1?(clump(x,y,5,110,215,160,0)?(h<70?2:h<125?(vn(x,y,4,10)>140?5:1):0):(h<8?2:0)):(h<5?2:0);} // SWAMP = wetland: thorny dead branches (2) and dead reeds stand out of the shallow bog in clumps, a few in the deep swamp (objects never block, so you can wade through)
+ TL=l;TSP=sp;TOB=ob;TC=c;TPOS=pos;TIDXI=idx;return l;}
+/* AREA size rule: a mountain is a cave only where it is big enough to hold a floor under a ceiling.
+   core = cell whose (2*CR+1)^2 neighbourhood is all mountain; cave cell = mountain cell within CR of a core. Smaller mountain bits (1 cell ... thin ridges) become a single brown boulder on rock ground (no ceiling). */
+const CR=3,RCX=new Int32Array(65536),RCY=new Int32Array(65536),RCV=new Uint8Array(65536),CCX=new Int32Array(65536),CCY=new Int32Array(65536),CCV=new Uint8Array(65536);
+function isMtn(x,y){const i=(Math.imul(x,73856093)^Math.imul(y,19349663))>>>16;if(RCV[i]&&RCX[i]===x&&RCY[i]===y)return RCV[i]===2;
+ const m=terr(x,y)===6;RCX[i]=x;RCY[i]=y;RCV[i]=m?2:1;return m;}
+function coreAt(x,y){const i=(Math.imul(x,19349663)^Math.imul(y,83492791))>>>16;if(CCV[i]&&CCX[i]===x&&CCY[i]===y)return CCV[i]===2;
+ let ok=true;for(let dy=-CR;dy<=CR&&ok;dy++)for(let dx=-CR;dx<=CR;dx++)if(!isMtn(x+dx,y+dy)){ok=false;break;}
+ CCX[i]=x;CCY[i]=y;CCV[i]=ok?2:1;return ok;}
+function caveCell(x,y){for(let dy=-CR;dy<=CR;dy++)for(let dx=-CR;dx<=CR;dx++)if(coreAt(x+dx,y+dy))return true;return false;}
+/* neighbour probe (cached): letter (6 only for cave mountain; small mountain bits count as rock = outside) | passable-object<<3. Passable = an obstacle without collision: tall tree (clear underneath) or small rock */
+const NCX=new Int32Array(65536),NCY=new Int32Array(65536),NCV=new Uint8Array(65536).fill(255);
+function ninfo(x,y){const i=(Math.imul(x,73856093)^Math.imul(y,19349663))>>>16;
+ if(NCX[i]===x&&NCY[i]===y&&NCV[i]!==255)return NCV[i];
+ const l0=terr(x,y),ob=TOB;let l=l0,p=0;
+ if(l0===6){if(!caveCell(x,y)){l=5;p=(hsh(x,y,9)<141&&(hsh(x,y,8)>>4)<10)?1:0;}} // rock state: small rocks are passable obstacles
+ else if(ob===3||ob===4){const v=hsh(x,y,8)>>4;p=((ob===3&&v>=7)||(ob===4&&v<10))?1:0;}
+ const r=l|(p<<3);NCX[i]=x;NCY[i]=y;NCV[i]=r;return r;}
+const NDX=[1,-1,0,0,1,1,-1,-1],NDY=[0,0,1,-1,1,-1,1,-1],GL=10; // 4 cardinal + 4 diagonal; entrance corridor length
+/* ENTRANCE: a mountain edge cell whose outer neighbour is a passable obstacle (tall tree / small rock) is opened, and a straight corridor of GL cells leads inward.
+   returns 1 = the entrance cell itself, 2 = corridor cell, 0 = none. per4 = this cell touches the outside (4-neighbour), so it cannot be a corridor cell */
+function flatFace(ex,ey,dx,dy){const px=-dy,py=dx; // ONE flat face: the entrance row has mountain 2 cells to each side, the row in front has none -> the doorway sits in a straight wall (no staircase corner, no second visible face)
+ for(let s=1;s<=2;s++)for(let sg=-1;sg<=1;sg+=2){if((ninfo(ex+px*s*sg,ey+py*s*sg)&7)!==6)return false;if((ninfo(ex+dx+px*s*sg,ey+dy+py*s*sg)&7)===6)return false;}
+ return true;}
+/* CAVE ENTRANCES by chunk (32x32 cells). Mountain outline = the cell noise as before; chunks only decide WHERE a doorway goes.
+   1. a chunk is a mountain chunk when >= 6 of 64 sample cells are cave cells; its OUTER faces are the sides whose neighbour chunk is not a mountain chunk (never a connecting side)
+   2. a chunk gets at most ONE doorway, on one outer face: open faces first (nothing mountain 2 chunks beyond), the start face rotates with the chunk coordinates, and two connected chunks never pick the same face
+   3. in a larger mass (3x3 neighbourhood > 2 mountain chunks) only the chunk with the lowest hash among the outer chunks around it opens a doorway: the count follows the outline length, not the area
+   4. every region (32x32 chunks) gets one doorway on each of N / E / S / W: the outermost chunk on that side is forced
+   5. inside the chunk the doorway is a cell of the outline facing that face, in the most concave place (walls on both sides, pocket in front) so only that one face shows it, and a corridor leads to the tunnels */
+const CHC=new Map(),RGC=new Map();
+const chKey=(gx,gy)=>FSX+'|'+FSY+'|'+gx+'|'+gy,chOrg=(gx,gy)=>[FX+(gx*32-FU),FY+(gy*32-FQ)],chHash=(gx,gy)=>hlat(5,gx,gy,110);
+function chMass(gx,gy){const k=chKey(gx,gy);let c=CHC.get(k);if(c)return c;
+ const o=chOrg(gx,gy);let m=0;for(let j=0;j<8;j++)for(let i=0;i<8;i++)if((ninfo(o[0]+i*4+2,o[1]+j*4+2)&7)===6)m++;
+ if(CHC.size>30000)CHC.clear();c={m,M:m>=6,ent:undefined};CHC.set(k,c);return c;}
+const isM=(gx,gy)=>chMass(gx,gy).M,outerD=(gx,gy,d)=>!isM(gx+NDX[d],gy+NDY[d]);
+function regionForce(gx,gy){const rx=Math.floor(gx/32),ry=Math.floor(gy/32),rk=FSX+'|'+FSY+'|R'+rx+'|'+ry;let r=RGC.get(rk);
+ if(!r){r=new Map();const list=[],used=new Set();
+  for(let j=0;j<32;j++)for(let i=0;i<32;i++){const cx=rx*32+i,cy=ry*32+j;if(isM(cx,cy))list.push([cx,cy]);}
+  for(const d of [3,0,2,1]){let best=null,bs=-1e18;for(const c of list){const ck=chKey(c[0],c[1]);if(used.has(ck)||!outerD(c[0],c[1],d))continue;
+    const sc=(d===3?-c[1]:d===2?c[1]:d===0?c[0]:-c[0])*1000+(255-chHash(c[0],c[1]))/1000;if(sc>bs){bs=sc;best=c;}}
+   if(best){const ck=chKey(best[0],best[1]);used.add(ck);r.set(ck,d);}}
+  if(RGC.size>2000)RGC.clear();RGC.set(rk,r);}
+ const f=r.get(chKey(gx,gy));return f===undefined?-1:f;}
+function faceOrder(gx,gy){const out=[],s=(gx+2*gy)&3;for(let i=0;i<4;i++){const d=(s+i)&3;if(outerD(gx,gy,d))out.push(d);}
+ const op=out.filter(d=>!isM(gx+2*NDX[d],gy+2*NDY[d])),cl=out.filter(d=>isM(gx+2*NDX[d],gy+2*NDY[d]));return op.concat(cl);}
+function findDoor(gx,gy,d){const o=chOrg(gx,gy),dx=NDX[d],dy=NDY[d],px=-dy,py=dx,cand=[];
+ for(let j=0;j<32;j++)for(let i=0;i<32;i++){const ex=o[0]+i,ey=o[1]+j;if((ninfo(ex,ey)&7)!==6)continue;
+  const ox=ex+dx,oy=ey+dy,n=ninfo(ox,oy);if((n&7)===6||!(n&8)||!okLand(ox,oy))continue; // the cell in front: dry land with a passable object
+  if((ninfo(ex+px,ey+py)&7)!==6||(ninfo(ex-px,ey-py)&7)!==6||(ninfo(ex-dx,ey-dy)&7)!==6)continue; // walls on both sides, rock behind: a single face
+  let sc=0;for(let k=0;k<8;k++)if((ninfo(ox+NDX[k],oy+NDY[k])&7)===6)sc++; // concavity of the cell in front (flat wall 3, pocket 5)
+  cand.push([sc,((ex*73856093)^(ey*19349663))>>>0,ex,ey]);}
+ cand.sort((p,q)=>q[0]-p[0]||p[1]-q[1]);
+ for(let t=0;t<Math.min(cand.length,12);t++){const c=cand[t];setFrame(c[2],c[3]);const L=gateLen(c[2],c[3],dx,dy);if(L>0)return {d,L,px:FU,py:FQ,sc:c[0]};}
+ return null;}
+function chEnt(gx,gy){const c=chMass(gx,gy);if(c.ent!==undefined)return c.ent;c.ent=null;if(!c.M)return null;
+ let faces=faceOrder(gx,gy);if(!faces.length)return null;
+ const fd=regionForce(gx,gy);
+ if(fd>=0)faces=[fd].concat(faces.filter(d=>d!==fd));
+ else{let cnt=0;for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++)if(isM(gx+i,gy+j))cnt++;
+  if(cnt>2){const h=chHash(gx,gy);for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++){if(!i&&!j)continue;const nx=gx+i,ny=gy+j;if(!isM(nx,ny))continue;
+    let ho=false;for(let d=0;d<4;d++)if(outerD(nx,ny,d))ho=true;if(!ho)continue;const h2=chHash(nx,ny);if(h2<h||(h2===h&&(ny<gy||(ny===gy&&nx<gx))))return null;}}
+  const pf=faces[0];for(let d=0;d<4;d++)if(!outerD(gx,gy,d)){const nx=gx+NDX[d],ny=gy+NDY[d],nf=faceOrder(nx,ny)[0];if(nf===pf&&chHash(nx,ny)<chHash(gx,gy)&&faces.length>1){faces=faces.slice(1).concat(pf);break;}}} // a connected neighbour with the same first choice and a lower hash takes it
+ let first=null;for(const d of faces){const e=findDoor(gx,gy,d);if(!e)continue;if(e.sc>=5||d===fd){c.ent=e;return e;}if(!first)first=e;} // a pocket (score 5) wins; otherwise the first flat doorway
+ if(first)c.ent=first;return first;}
+function entrance(ex,ey,d,fx,fy){setFrame(ex,ey);const gx=Math.floor(FU/32),gy=Math.floor(FQ/32),apx=FU,apy=FQ,e=chEnt(gx,gy);setFrame(fx,fy);
+ return e&&e.d===d&&e.px===apx&&e.py===apy?e.L:0;}
+function gateK(x,y,per4){
+ for(let d=0;d<4;d++){const dx=NDX[d],dy=NDY[d]; // d = outward direction, the corridor runs the opposite way
+  for(let k=0;k<=GL;k++){
+   if(k>0){if(per4)break;if((ninfo(x+dx*k,y+dy*k)&7)!==6)break;}
+   const ex=x+dx*k,ey=y+dy*k,n=ninfo(ex+dx,ey+dy);
+   if((n&7)!==6&&(n&8)){const L=entrance(ex,ey,d,x,y);if(L>0&&k<=L){GD=d;return k===0?1:2;}}}} // only gates whose corridor reaches the tunnel network
+ return 0;}
+function gateLen(ex,ey,dx,dy){for(let j=1;j<=GL;j++){const cx=ex-dx*j,cy=ey-dy*j;
+ for(let k=0;k<4;k++)if((ninfo(cx+NDX[k],cy+NDY[k])&7)!==6)return 0; // the corridor must not run along the outside edge
+ {const cv=cave(cx,cy,96);if(cv&&cv!==4)return j;}}return 0;} // first inward cell that touches a tunnel
+function sample(x,y){terr(x,y);const l=TL,sp=TSP,ob=TOB,c=TC,tpos=TPOS,tidx=TIDXI;
+ let w=0,sv=-1,fl=0,so=ob,spx=sp;
+ let cf=0;if(l<=5&&!FAST&&tidx){cf=gateAt(x,y);setFrame(x,y);} // structures: only on land; on water only the road (a bridge)
+ if(l===6){const bs=48,be=64,dI=Math.min(tpos-bs,be-tpos),e=Math.min(255,(dI/Math.max(0.5,Math.min((be-bs)/2,2.56))*255)|0),hl=Math.min(255,Math.max(0,128+(((150*vn(x,y,5,50)+106*vn(x,y,3,51))>>8)-128)*2)),a=(hl*e)>>8;sv=a; // height: low at the foot, hills inside
+  if(!FAST&&!caveCell(x,y)){SO=clump(x,y,4,110,235,150,0)&&hsh(x,y,9)<150?4:0;SC=c;SV=hsh(x,y,8);return 5|64;} // too small for a cave: ROCK state = same floor, big (blocking) and small (passable) brown rocks
+  let per=false,per4=false,g=0;
+  if(!FAST){for(let k=0;k<8;k++)if((ninfo(x+NDX[k],y+NDY[k])&7)!==6){per=true;if(k<4)per4=true;}g=gateK(x,y,per4);}
+  if(g){w=0;if(g===1)fl=1;} // entrance / corridor: floor
+  else if(per)w=1; // boundary of the AREA: wall
+  else{const cv=cave(x,y,a);if(!cv)w=1;else{w=0;
+   if(cv===4){w=1;fl=2;} // pillar (from the tile pattern)
+   else if(cv>1){spx=lavaMt(FU+(x-FX),FQ+(y-FY))?2:3;if(cv===3)fl|=2;} // liquid in the pools: magma zones (~a fifth of the liquids), water elsewhere; deep (bit 7) = impassable
+   else{const h2=hsh(x,y,40);if(h2>=236){so=4;sv=(hsh(x,y,8)*160)>>8;}}}}}
+ if(cf){so=0;if(cf===1)fl=1;else if(cf===2)fl=2;else if(cf===3){w=1;fl=2;}else if(cf===5)fl=3;else if(cf===6){w=1;fl=3;}} // bit 7 = building, bit 6 = road, both = open yard (floor) / stone wall (wall) // bit 6 = road (letters 1-4), bit 7 = building (wall if w, floor otherwise)
+ SO=so;SC=c;SV=sv>=0?sv:hsh(x,y,8);return l|(w<<3)|(spx<<4)|(fl<<6);}
+/* ===== window: same mechanism as BLACKMAGIC SYNC_WINDOW (64x64 torus around the player, entering rows/columns only) ===== */
+const WS=64,WIN={code:new Uint8Array(4096),cb:new Uint8Array(4096),vb:new Uint8Array(4096),ob:new Uint8Array(4096),ox:0,oy:0,ready:false};
+function winWrite(x,y){const k=((y&63)<<6)|(x&63);WIN.code[k]=sample(x,y);WIN.cb[k]=SC;WIN.vb[k]=SV;WIN.ob[k]=SO;}
+function syncWindow(px,py){const nx=Math.floor(px)-32,ny=Math.floor(py)-32;if(WIN.ready&&nx===WIN.ox&&ny===WIN.oy)return;
+ const dx=nx-WIN.ox,dy=ny-WIN.oy;
+ if(!WIN.ready||Math.abs(dx)>=WS||Math.abs(dy)>=WS){for(let y=ny;y<ny+WS;y++)for(let x=nx;x<nx+WS;x++)winWrite(x,y);WIN.ready=true;}
+ else{
+  if(dx>0)for(let x=WIN.ox+WS;x<nx+WS;x++)for(let y=ny;y<ny+WS;y++)winWrite(x,y);
+  else if(dx<0)for(let x=nx;x<WIN.ox;x++)for(let y=ny;y<ny+WS;y++)winWrite(x,y);
+  const xa=Math.max(nx,WIN.ox),xb=Math.min(nx,WIN.ox)+WS; // retained columns: each entering cell is written once, also on diagonals
+  if(dy>0)for(let y=WIN.oy+WS;y<ny+WS;y++)for(let x=xa;x<xb;x++)winWrite(x,y);
+  else if(dy<0)for(let y=ny;y<WIN.oy;y++)for(let x=xa;x<xb;x++)winWrite(x,y);}
+ WIN.ox=nx;WIN.oy=ny;}
+let CODE=0,CB=0,VB=0,OB=0;
+function cell(ix,iy){const x=ix-WIN.ox,y=iy-WIN.oy;
+ if(WIN.ready&&x>=0&&x<64&&y>=0&&y<64){const k=((iy&63)<<6)|(ix&63);CODE=WIN.code[k];CB=WIN.cb[k];VB=WIN.vb[k];OB=WIN.ob[k];}
+ else{CODE=sample(ix,iy);CB=SC;VB=SV;OB=SO;}} // outside the window (edge rays, far probes): generate directly
+/* ===== skins ===== */
+const FL=[[0,0,0],[51,51,51],[153,153,153],[102,102,102],[70,70,70],[34,34,34],[85,85,85]],WL=[0,0,0,0,0,0,[102,102,102]],ICE=[128,128,128],LAVA=[255,102,0]; // minimap greys: deep swamp, shallow bog, sand, dead grass, withered forest, conifer forest, mountain
+function colorOf(code,cb,vb,o){const l=code&7,w=(code>>3)&1,sp=(code>>4)&3;const b=((code&64)&&l===6)?[153,153,153]:sp===3?[51,51,51]:sp===1?ICE:sp===2?LAVA:(w?WL[l]:FL[l]);
+ const v=1+((vb-128)/128)*0.07;o[0]=Math.min(255,b[0]*v);o[1]=Math.min(255,b[1]*v);o[2]=Math.min(255,b[2]*v);}
+const SK=[[[0,0,0],[40,40,40]],[[6,6,6],[51,51,51]],[[14,14,14],[64,64,64]]]; // sky: black above, dark grey at the horizon (the fog colour)
+function skyAt(c,w){const lo=c<0.5,a=SK[lo?0:1][w],b=SK[lo?1:2][w],u=lo?c*2:(c-0.5)*2;return [a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u,a[2]+(b[2]-a[2])*u];}
+/* ===== textures: ported from BLACKMAGIC ENSURE_NATURE_ASSETS (32x32, same hash) ===== */
+const hx=(x,y,k=0)=>{let h=Math.imul(x+1013,374761393)^Math.imul(y+7919,668265263)^Math.imul(k+31,1274126177);h=Math.imul(h^(h>>>15),2246822519);h^=h>>>13;h=Math.imul(h,3266489917);h^=h>>>16;return (h>>>0)%101;}; // texture hash (mixed bits: no grid / brick artefacts)
+const GRAYS=[0,51,102,153],Z0='#000000',Z1='#333333',Z2='#666666',Z3='#999999'; // the whole world is drawn with four greys: #000 #333 #666 #999
+const HEX=c=>{if(!c)return 0;const n=parseInt(c.slice(1),16),L=0.3*(n>>16)+0.59*((n>>8)&255)+0.11*(n&255),v=GRAYS[L<26?0:L<77?1:L<128?2:3];return (255<<24)|(v<<16)|(v<<8)|v;};
+const RAW=c=>{if(!c)return 0;const n=parseInt(c.slice(1),16);return (255<<24)|((n&255)<<16)|(n&0xff00)|(n>>16);}; // untouched colour: ONLY lava and fire use it (red / orange / yellow, web-safe); everything else goes through HEX = four greys
+const mkTexC=fn=>{const a=new Uint32Array(1024);for(let y=0;y<32;y++)for(let x=0;x<32;x++)a[y*32+x]=RAW(fn(x,y));return a;};
+/* rock sprites in the style of the reference: black outline, flat facets (light top-left, dark bottom-right), cracks, small stones at the foot. Four greys only. */
+function mkRockSp(pts,seeds,cracks,extras,sd){const a=new Uint32Array(1024),TN=[Z0,Z1,Z2,Z3].map(HEX),tone=new Int8Array(1024).fill(-1),fid=new Int8Array(1024).fill(-1),out=new Int8Array(1024).fill(-1),
+ ins=(x,y)=>{let c=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const xi=pts[i][0],yi=pts[i][1],xj=pts[j][0],yj=pts[j][1];if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)c=!c;}return c;},
+ inn=(x,y)=>x>=0&&x<32&&y>=0&&y<32&&tone[y*32+x]>=0,BY=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5];
+ for(let y=0;y<32;y++)for(let x=0;x<32;x++)if(ins(x+0.5,y+0.5)){let b=0,bd=1e9;for(let i=0;i<seeds.length;i++){const dx=x-seeds[i][0],dy=y-seeds[i][1],d=dx*dx+dy*dy;if(d<bd){bd=d;b=i;}}fid[y*32+x]=b;tone[y*32+x]=seeds[b][2];}
+ const edge=new Uint8Array(1024);for(let y=0;y<32;y++)for(let x=0;x<32;x++)if(inn(x,y)&&(!inn(x-1,y)||!inn(x+1,y)||!inn(x,y-1)||!inn(x,y+1)))edge[y*32+x]=1;
+ for(let y=0;y<32;y++)for(let x=0;x<32;x++){const p=y*32+x;if(!inn(x,y)||edge[p])continue;
+  if(inn(x+1,y)&&!edge[p+1]&&fid[p+1]!==fid[p]&&tone[p]>=2&&tone[p+1]>=2)tone[p]-=1; // dark seam between two lit facets
+  else if(inn(x,y+1)&&!edge[p+32]&&fid[p+32]!==fid[p]&&tone[p]>=2&&tone[p+32]>=2)tone[p]-=1;}
+ // volume: light from the top-left. every facet is lit on its upper-left and shaded on its lower-right, the rim next to the outline catches / loses light,
+ // bedding lines and small pits add stone grain; the in-between tones come from an ordered dither (regular, no random speckle). Four greys only.
+ for(let y=0;y<32;y++)for(let x=0;x<32;x++){const p=y*32+x;if(!inn(x,y)||edge[p])continue;
+  const s=seeds[fid[p]];let g=((s[0]-x)*0.6+(s[1]-y)*0.8)/6;g=Math.max(-1,Math.min(1,g));let v=tone[p]+g*0.55;
+  if(edge[p-1]||edge[p-32])v+=0.55;if(edge[p+1]||edge[p+32])v-=0.6; // lit rim top-left, shaded rim bottom-right
+  if(((y+(hx(x>>3,sd,3)%3))%6)===0)v-=0.4; // faint, uneven bedding lines
+  if(hx(x>>1,y,sd+5)<6)v-=0.9; // small pits (2 px wide)
+  out[p]=Math.max(0,Math.min(3,Math.floor(v+0.5+(BY[(y&3)*4+(x&3)]/16-0.47)*0.7)));}
+ for(const [x0,y0,x1,y1] of cracks){const n=Math.ceil(Math.max(Math.abs(x1-x0),Math.abs(y1-y0))*2);let jx=0;for(let i=0;i<=n;i++){if(i%3===0)jx=Math.round((hx(i,x0*7+y0,sd+9)/100-0.5)*1.6); // jagged crack
+  const x=Math.round(x0+(x1-x0)*i/n)+((Math.abs(y1-y0)>=Math.abs(x1-x0))?jx:0),y=Math.round(y0+(y1-y0)*i/n)+((Math.abs(y1-y0)<Math.abs(x1-x0))?jx:0),p=y*32+x;
+  if(inn(x,y)&&!edge[p]){out[p]=0;const q=p+33;if(inn(x+1,y+1)&&!edge[q]&&out[q]<3)out[q]+=1;}}} // crack: dark line with a lit lip on its lower-right
+ for(let p=0;p<1024;p++)a[p]=edge[p]?TN[0]:out[p]>=0?TN[out[p]]:0;
+ let my=0;for(let p=0;p<1024;p++)if(inn(p&31,p>>5))my=Math.max(my,p>>5);
+ if(my<31)for(let x=0;x<32;x++)if(a[(my+1)*32+x]===0&&inn(x,my))a[(my+1)*32+x]=TN[1]; // contact shadow under the foot
+ for(const [cx,cy,r] of extras)for(let y=Math.floor(cy-r-1);y<=Math.ceil(cy+r+1);y++)for(let x=Math.floor(cx-r-1);x<=Math.ceil(cx+r+1);x++){const d=Math.hypot(x-cx,y-cy);if(x<0||x>31||y<0||y>31||d>r+0.5)continue;a[y*32+x]=d>r-0.6?TN[0]:(x-cx)+(y-cy)<-0.5?TN[2]:TN[1];} // small stones at the foot
+ return a;}
+const mkTex=fn=>{const a=new Uint32Array(1024);for(let y=0;y<32;y++)for(let x=0;x<32;x++)a[y*32+x]=HEX(fn(x,y));return a;};
+const mkRock=(p,vert,sd)=>mkTex((x,y)=>{const a=vert?x:y,b=vert?y:x,lay=(a+(hx(b>>3,sd,5)%5)-2+(hx(b>>1,sd,6)%3))>>2; // natural rock: wobbly strata + two noise scales + sparse cracks, no brick seams
+ if(hx(x>>2,y>>2,sd+2)<7&&hx(x,y,sd+3)<60)return p[3];const n=hx(lay,sd,7)%40+hx(x>>1,y>>1,sd)%35+hx(x,y,sd+1)%25;return n<30?p[0]:n<62?p[1]:p[2];});
+/* vegetation / rock sprites drawn from shapes (branches, fronds, leaf clumps, cracks) instead of random speckle */
+const txPut=(a,x,y,c)=>{x=Math.round(x);y=Math.round(y);if(x>=0&&x<32&&y>=0&&y<32)a[y*32+x]=c;};
+function txLine(a,x0,y0,x1,y1,c){const n=Math.max(1,Math.ceil(Math.max(Math.abs(x1-x0),Math.abs(y1-y0))*2));for(let i=0;i<=n;i++)txPut(a,x0+(x1-x0)*i/n,y0+(y1-y0)*i/n,c);}
+function txClumps(a,list,pal,gap){for(const [cx,cy,r] of list)for(let y=Math.floor(cy-r-1);y<=cy+r+1;y++)for(let x=Math.floor(cx-r-1);x<=cx+r+1;x++){
+ const d=(x-cx)**2+(y-cy)**2;if(d>r*r+hx(x,y,9)%3-1)continue;if(d>r*r*0.5&&hx(x,y,10)<gap)continue; // ragged rim, small gaps
+ const q=d/(r*r);txPut(a,x,y,pal[q>0.6?0:q>0.25?(hx(x,y,11)<30?2:1):(hx(x,y,12)<35?3:2)]);}} // dark rim -> light centre (no light direction)
+function mkOak(){const a=new Uint32Array(1024),tr=['#6a4e31','#59432c','#3f2f1e'].map(HEX),lf=['#2a5f2c','#37733a','#4a8c3e','#62a64b'].map(HEX);
+ for(let y=16;y<=31;y++){const w=y>26?2:1;for(let x=16-w;x<=15+w;x++)txPut(a,x,y,tr[hx(x,y,6)%3]);}
+ txLine(a,15,20,9,14,tr[1]);txLine(a,16,19,23,13,tr[1]);
+ txClumps(a,[[16,9,7],[9,12,5],[23,12,5],[12,6,4],[20,6,4],[16,15,5],[6,16,3],[26,16,3]],lf,16);return a;}
+function mkDead(){const a=new Uint32Array(1024),tr=[Z1,Z2,Z0].map(HEX),tw=HEX(Z2); // withered tree: bare trunk and branches, no leaves
+ for(let y=14;y<=31;y++){const w=y>27?2:1;for(let x=16-w;x<=15+w;x++)txPut(a,x,y,tr[hx(x,y,6)%3]);}
+ txLine(a,15,21,8,12,tr[1]);txLine(a,16,18,24,9,tr[1]);txLine(a,15,15,12,5,tr[1]);txLine(a,16,14,19,3,tr[1]);
+ txLine(a,8,12,4,10,tw);txLine(a,8,12,6,6,tw);txLine(a,24,9,28,7,tw);txLine(a,24,9,26,3,tw);txLine(a,12,5,9,2,tw);txLine(a,19,3,22,1,tw);txLine(a,16,20,21,17,tw);txLine(a,15,23,11,21,tw);
+ return a;}
+function mkPine(){const a=new Uint32Array(1024),nd=[Z0,Z1,Z1,Z2].map(HEX),tk=[Z1,Z0,Z0].map(HEX); // conifer: black / dark grey needles
+ txLine(a,15.5,1,15.5,22,nd[0]);txLine(a,16.5,1,16.5,22,nd[1]);
+ for(let y=21;y<=31;y++){const x0=y>27?14:15,x1=y>27?17:16;for(let x=x0;x<=x1;x++)txPut(a,x,y,tk[hx(x,y,6)%3]);} // bare trunk below the branches, flared root
+ for(let i=0;i<7;i++){const y0=1+i*2.7,L=2+i*1.9;for(const s of [-1,1]){const ex=15.5+s*L,ey=y0+L*0.5;txLine(a,15.5,y0,ex,ey,nd[1+hx(i,s+2,7)%2]);
+  for(let k=1;k<=L;k+=1.5){const t=k/L;txLine(a,15.5+s*L*t,y0+(ey-y0)*t,15.5+s*L*t+s*0.5,y0+(ey-y0)*t+2.5,nd[hx(k*3|0,i,8)%4]);}}} // drooping branches with needle strokes
+ return a;}
+function mkPalm(){const a=new Uint32Array(1024),tk=['#8a6b45','#6f5433','#9a7a52'].map(HEX),fr=['#3d8530','#4e9a3a','#62ad45'].map(HEX);
+ for(let y=12;y<=31;y++){const cx=17-(y-12)*0.16;for(const dx of [-1,0,1]){const x=Math.round(cx+dx*0.6);txPut(a,x,y,y%3===0?tk[1]:tk[hx(x,y,6)%3===2?2:0]);}}
+ for(const [ex,ey] of [[4,15],[30,15],[7,7],[27,7],[17,3],[1,22],[31,22]]){const cx=(17+ex)/2,cy=Math.min(12,ey)-5; // arching fronds with leaflets
+  for(let i=1;i<=36;i++){const t=i/36,u=1-t,x=u*u*17+2*u*t*cx+t*t*ex,y=u*u*12+2*u*t*cy+t*t*ey,tx=2*u*(cx-17)+2*t*(ex-cx),ty=2*u*(cy-12)+2*t*(ey-cy),l=Math.hypot(tx,ty)||1,nx=-ty/l,ny=tx/l;
+   txPut(a,x,y,fr[1]);if(i%3===0&&t>0.15){const ll=2.0*(1-t*0.4);txLine(a,x,y,x+nx*ll,y+ny*ll,fr[hx(i,ex,8)%3]);txLine(a,x,y,x-nx*ll,y-ny*ll,fr[hx(i,ey,9)%3]);}}}
+ return a;}
+function mkBirch(){const a=new Uint32Array(1024),lf=['#6f9f34','#85b53f','#9fcb55','#b4dc6b'].map(HEX),tr=HEX('#e6e2d8'),mk=HEX('#3a3a36');
+ for(let y=10;y<=31;y++){txPut(a,15,y,tr);txPut(a,16,y,hx(15,y,4)<24?mk:tr);}
+ txLine(a,15,16,9,11,tr);txLine(a,16,14,23,9,tr);
+ txClumps(a,[[16,7,5],[9,10,4],[23,8,4],[13,3,3],[20,3,3],[6,14,3],[26,12,3]],lf,26);
+ for(let i=0;i<9;i++){const x=4+hx(i,1,5)%24,y=9+hx(i,2,5)%5;txLine(a,x,y,x,y+3+hx(i,3,5)%3,lf[hx(i,4,5)%3]);} // drooping twigs
+ return a;}
+function mkThorn(){const s='..................102.............................000.............................00.............................102............................102.............................1001.............................001...................11........00.....................2........02.....................0......0100....................1001....0001.....................100...1002........................0011002.........................000002.........................100000111........................101.000..........................02.0001..........................00000...........................10002..............................0001.............................0001............................000............................000.............................001.....1......................0000....00......................001....102......................001....001.....................10001..1001.......................100100000........................00001............................02..............................11.............',a=new Uint32Array(1024),pl=[Z0,Z1,Z2,Z3].map(HEX);for(let i=0;i<1024;i++)if(s[i]!=='.')a[i]=pl[+s[i]];return a;} // sand / wasteland plant: a black thorny dead branch (traced from the reference picture), 4 greys (0 #000 1 #333 2 #666, . = transparent)
+function mkShrub(){const a=new Uint32Array(1024),lf=[Z1,Z2,Z2,Z3].map(HEX);txClumps(a,[[8,26,5],[16,24,6],[24,26,5],[12,21,4],[21,21,4]],lf,12);return a;}
+const T_GRASS=mkTex((x,y)=>{const h=hx(x,y);return h<4?Z3:h<24?Z2:Z1;}), // dead grass ground: dark grey with pale flecks
+T_SAND=mkTex((x,y)=>{const h=hx(x,y,7);return h<10?Z2:h<13?Z1:Z3;}), // ash sand
+T_DIRT=mkTex((x,y)=>{const h=hx(x,y);return h<8?Z3:h<45?Z2:Z1;}),
+T_OCEAN=mkTex((x,y)=>{const n=hx(x>>1,y>>1,11)+hx(x>>2,y>>2,12);return hx(x,y,13)<2?Z1:n<50?Z1:Z0;}), // DEEP SWAMP: black sludge, dark patches, bubbles toned down to the patch grey
+T_STONE=mkTex((x,y)=>{const row=Math.floor(y/8),seam=y%8===0||(x+(row%2)*8)%16===0;return seam?'#30343a':hx(x>>1,y>>1)<24?'#858b89':hx(x>>1,y>>1)<62?'#727a7b':'#646e71';}),
+T_FOREST=mkTex((x,y)=>{const trunk=(x%9===4&&y>11),crown=((x%9-4)**2+(y%18-8)**2<60);return trunk?'#403320':crown?(hx(x,y)<30?'#2c582d':hx(x,y)<65?'#386d36':'#244c2b'):'#1e3d26';}),
+T_SHRUB=mkShrub(),T_THORN=mkThorn(),
+T_TREE=mkDead(),
+T_ROCK=mkRockSp([[15,15],[20,17],[25,22],[26,27],[22,30],[9,30],[5,27],[5,22],[9,18]],[[11,19,3],[22,22,1],[15,24,2],[9,27,2],[20,28,0]],[[12,18,16,24]],[],82), // small rock (passable): faceted, black outline, crack
+T_SHALLOW=mkTex((x,y)=>{const n=hx(x>>1,y>>1,21)+hx(x>>2,y>>2,22),st=((y*5+(x>>3)*3)%9===0)&&hx(x,y,24)<55;return hx(x,y,23)<2||st?Z2:n<80?Z2:Z1;}), // SHALLOW BOG: grey mud, wet streaks toned down to the mud grey
+T_PINE=mkPine(), // new: conifer
+T_BIRCH=mkBirch(), // new: birch
+T_PALM=mkPalm(), // new: palm
+T_PINEWALL=mkTex((x,y)=>{const cx=(x%12)-5.5,row=y%16,crown=row<14&&Math.abs(cx)<0.5+row*0.42;return crown?(hx(x,y)<30?'#2d5e40':hx(x,y)<65?'#235038':'#1b4030'):(row>=14&&Math.abs(cx)<1?'#3d2f20':'#16301f');}), // new: conifer forest wall
+T_JUNGLE=mkTex((x,y)=>{const crown=((x%7-3)**2+(y%11-5)**2<9),vine=(x*5+y*3)%13===0;return vine?'#5aa33a':crown?(hx(x,y)<30?'#3f9a38':hx(x,y)<65?'#2f8530':'#26702a'):'#17491f';}), // new: jungle wall
+T_BOULDER=mkRockSp([[14,2],[21,5],[26,11],[28,18],[27,25],[23,29],[10,29],[4,26],[3,19],[6,12],[9,7]],[[11,9,3],[24,14,1],[16,18,2],[7,22,2],[22,25,0],[13,27,1]],[[14,5,17,14],[10,14,18,16]],[[4,29,2.2],[28,29,2.6]],81), // boulder (blocks): big faceted rock with stones at its foot
+T_ICE=mkTex((x,y)=>hx(x,y,3)<25?Z2:Z3), // ice
+T_LAVA=mkTexC((x,y)=>{const n=hx(x>>2,y>>2,5)%50+hx(x>>1,y>>1,6)%30+hx(x,y,7)%20;return n<24?'#990000':n<46?'#cc3300':n<70?'#ff6600':'#ffcc00';}), // LAVA: the only coloured thing - deep red crust, red, orange, yellow glow
+T_CAVEWALL=mkRock([Z1,Z2,Z1,Z0],0,41), // cave: grey strata with black cracks
+T_PILLAR=mkRock([Z2,Z3,Z2,Z0],1,42), // cave: vertical streaks, lighter
+T_CEIL=mkRock([Z0,Z1,Z0,Z0],0,43), // cave: black rock
+T_CFLOOR=mkTex((x,y)=>{const n=hx(x>>2,y>>2,31)%40+hx(x>>1,y>>1,32)%35+hx(x,y,33)%25;if(hx(x,y,34)<5)return Z3;return n<20?Z0:n<60?Z1:Z2;}); // cave floor: dark grey with a few pale pebbles
+const T_BOULDERB=mkRockSp([[12,3],[19,2],[25,8],[28,15],[27,23],[24,29],[16,30],[8,29],[3,24],[4,15],[7,8]],[[10,8,3],[18,6,3],[24,14,1],[14,16,2],[8,22,2],[21,23,1],[15,27,0]],[[12,4,13,12],[18,5,22,12],[9,15,17,17],[16,18,15,26]],[[3,30,2.2],[29,30,2]],84), // cave boulder: more cracked, crumbling
+T_ROCKB=mkRockSp([[13,16],[19,16],[24,20],[26,26],[23,30],[10,30],[6,27],[7,21],[10,18]],[[10,20,3],[20,20,2],[24,25,1],[14,26,2],[19,28,0]],[[11,19,13,25]],[[5,30,1.8],[27,30,1.8]],83); // cave rock
+const T_ROAD=mkTex((x,y)=>{const h=hx(x,y,61);return hx(x,y,62)<7?'#b3a07a':h<30?'#7a5e3a':h<62?'#9c7e52':'#8a6d45';}), // road: packed earth
+T_BRIDGE=mkTex((x,y)=>{const row=y>>2;return y%4===0?'#4a3520':hx(row,x>>3,63)<50?'#8b6b3e':'#7a5c33';}), // bridge: planks
+T_BWALL=mkTex((x,y)=>{if(x%16<2||y%16<2)return '#6b4a2b';return hx(x>>1,y>>1,64)<25?'#bfb08c':hx(x,y,65)<8?'#a89a78':'#cdbf9c';}), // building wall: plaster and timber
+T_BFLOOR=mkTex((x,y)=>{const col=x>>2;return x%4===0?'#3f2c19':hx(col,0,66)<50?'#9a7b4d':'#866a41';}); // building floor: planks
+const T_BCEIL=mkTex((x,y)=>{const b=(y>>3)&1;if(y%8===0||x%16===((b*8)&15))return '#2c1d10';return hx(x>>1,y>>1,67)<30?'#5c4128':'#4b351f';}), // building ceiling: dark beams and boards
+T_COURT=mkTex((x,y)=>{const sx=(x+((y>>4)&1)*8)%16===0||y%16===0;return sx?'#6b665c':hx(x>>1,y>>1,68)<40?'#9a948a':'#88827a';}); // courtyard: flagstones
+function mkGrass(n,hMin,hMax,spr,fan,sd){const a=new Uint32Array(1024),pal=[Z1,Z1,Z2,Z2,Z3].map(HEX); // blades: curved polylines, dark base -> light tip
+ for(let i=0;i<n;i++){const r1=hx(i,1,sd),r2=hx(i,2,sd),r3=hx(i,3,sd),r4=hx(i,4,sd),x0=16+(r1-50)/50*spr,len=hMin+(hMax-hMin)*r2/100,lean=(x0-16)*fan+(r3-50)/50*3,steps=Math.ceil(Math.max(len,Math.abs(lean))*2);
+  for(let k=0;k<=steps;k++){const t=k/steps,x=Math.round(x0+lean*Math.pow(t,1.6)),y=Math.round(31-len*t);if(x<0||x>31||y<0||y>31)continue;
+   const ci=Math.min(4,Math.max(0,Math.floor(t*4.99)+(r4<25?-1:r4>75?1:0)));a[y*32+x]=pal[ci];if(t<0.25&&r4>50&&x<31)a[y*32+x+1]=pal[Math.max(0,ci-1)];}}
+ return a;}
+const T_GTW=mkGrass(12,16,27,9,0.12,1),T_GTD=mkGrass(22,15,27,10,0.12,2),T_GWS=mkGrass(12,7,15,11,0.5,3),T_GWD=mkGrass(22,7,16,11,0.5,4); // tall / wide, sparse / dense
+const T_FOF=mkTex((x,y)=>{const h=hx(x,y,71);return h<5?Z2:h<30?Z1:Z0;}), // withered forest floor: black with dead leaves
+T_FCO=mkTex((x,y)=>{const h=hx(x,y,72),n=((x*3+y)%7===0)&&h<60;return n?Z2:h<35?Z1:Z0;}); // conifer forest floor: black with needle streaks
+const FLOORTEX=[T_OCEAN,T_SHALLOW,T_SAND,T_GRASS,T_FOF,T_FCO,T_DIRT],WALLTEX=[0,0,0,0,T_FOREST,T_STONE,T_CAVEWALL];
+/* ===== footsteps: no WebAudio (Tor Browser). Clips are synthesized once in JS, encoded as WAV, played with HTMLAudio ===== */
+const SR=22050,STEPVOL={grass:0.35,leaf:0.35,sand:0.4,water:0.5,rock:0.55};
+let SND=true,stepAcc=0,CLIPS=null;const lastV={};
+function biquad(type,fq,q){ // RBJ cookbook; lowpass/highpass Q in dB like WebAudio
+ const w=2*Math.PI*Math.min(fq,SR*0.45)/SR,c=Math.cos(w),a=Math.sin(w)/(2*(type==='bandpass'?q:Math.pow(10,q/20)));let b0,b1,b2;
+ if(type==='lowpass'){b0=(1-c)/2;b1=1-c;b2=b0;}else if(type==='highpass'){b0=(1+c)/2;b1=-(1+c);b2=b0;}else{b0=a;b1=0;b2=-a;}
+ const a0=1+a;return [b0/a0,b1/a0,b2/a0,-2*c/a0,(1-a)/a0];}
+function mixBurst(buf,t,dur,att,vol,type,fq,q){ // filtered noise with attack + exponential decay
+ const [b0,b1,b2,a1,a2]=biquad(type,fq,q),i0=Math.floor(t*SR),i1=Math.min(buf.length,Math.ceil((t+att+dur)*SR));let x1=0,x2=0,y1=0,y2=0;
+ for(let i=i0;i<i1;i++){const x=Math.random()*2-1,y=b0*x+b1*x1+b2*x2-a1*y1-a2*y2;x2=x1;x1=x;y2=y1;y1=y;
+  const tt=i/SR-t,g=tt<att?vol*tt/att:vol*Math.pow(0.0001/vol,(tt-att)/dur);buf[i]+=y*g;}}
+function recipe(kind,B){const r=Math.random,pr=0.9+r()*0.2;
+ if(kind==='grass'){B(0,0.16,0.022,0.2,'bandpass',(1300+r()*500)*pr,0.5);const n=1+((r()*2)|0);for(let i=0;i<n;i++)B(0.04+r()*0.1,0.05,0.006,0.07,'bandpass',2400+r()*800,0.6);} // soft slow swish + faint blades
+ else if(kind==='leaf'){B(0,0.18,0.02,0.2,'bandpass',(1900+r()*600)*pr,0.5);B(0.07+r()*0.04,0.15,0.02,0.15,'bandpass',(1600+r()*600)*pr,0.5);const n=2+((r()*2)|0);for(let i=0;i<n;i++)B(0.03+r()*0.14,0.05,0.006,0.06,'bandpass',2400+r()*700,0.6);}
+ else if(kind==='sand'){B(0,0.16,0.022,0.24,'bandpass',(560+r()*220)*pr,0.5);const n=1+((r()*2)|0);for(let i=0;i<n;i++)B(0.04+r()*0.1,0.05,0.006,0.08,'bandpass',1100+r()*400,0.6);}
+ else if(kind==='water'){B(0,0.1,0.002,0.26,'bandpass',1800*pr,0.7);B(0.005,0.14,0.004,0.16,'highpass',3000,0.5); // splash body + spray
+  const n=6+((r()*4)|0);for(let i=0;i<n;i++)B(0.04+r()*0.18,0.008+r()*0.01,0.0008,0.06+r()*0.07,'bandpass',3500+r()*3500,3);} // flying droplets
+ else{B(0,0.2,0.012,0.5,'lowpass',(260+r()*60)*pr,1.2);B(0.01,0.24,0.02,0.4,'lowpass',(150+r()*40)*pr,1.0); // rocky: low rumble + rolling pebbles
+  const n=3+((r()*3)|0);for(let i=0;i<n;i++)B(0.03+r()*0.14,0.025+r()*0.02,0.003,0.05+r()*0.06,'bandpass',450+r()*350,2.0);}}
+function makeClip(kind){const buf=new Float32Array(Math.floor(SR*0.4));recipe(kind,(t,d,a,v,ty,f,q)=>mixBurst(buf,t,d,a,v,ty,f,q));
+ let pk=0;for(let i=0;i<buf.length;i++)pk=Math.max(pk,Math.abs(buf[i]));const k=pk>0?STEPVOL[kind]/pk:1;for(let i=0;i<buf.length;i++)buf[i]*=k;return buf;}
+function wavUrl(f32){const n=f32.length,ab=new ArrayBuffer(44+n*2),u=new DataView(ab),w=(o,t)=>{for(let i=0;i<t.length;i++)u.setUint8(o+i,t.charCodeAt(i));};
+ w(0,'RIFF');u.setUint32(4,36+n*2,true);w(8,'WAVEfmt ');u.setUint32(16,16,true);u.setUint16(20,1,true);u.setUint16(22,1,true);u.setUint32(24,SR,true);u.setUint32(28,SR*2,true);u.setUint16(32,2,true);u.setUint16(34,16,true);w(36,'data');u.setUint32(40,n*2,true);
+ for(let i=0;i<n;i++)u.setInt16(44+i*2,Math.max(-1,Math.min(1,f32[i]))*32767,true);
+ try{return URL.createObjectURL(new Blob([ab],{type:'audio/wav'}));}catch(e){let b='';const a=new Uint8Array(ab);for(let i=0;i<a.length;i++)b+=String.fromCharCode(a[i]);return 'data:audio/wav;base64,'+btoa(b);}}
+function audioInit(){if(CLIPS||!SND||typeof Audio==='undefined')return; // called from the first key/tap (autoplay rule)
+ try{CLIPS={};for(const kind of ['grass','leaf','sand','water','rock']){CLIPS[kind]=[];lastV[kind]=0;for(let v=0;v<6;v++){const a=new Audio(wavUrl(makeClip(kind)));a.preload='auto';CLIPS[kind].push(a);}}}catch(e){CLIPS=null;}
+ try{sfxInit();}catch(e){SFXC=null;}}
+function step(kind){if(!CLIPS||!SND)return;const k=CLIPS[kind],n=k.length,s=(lastV[kind]+1+((Math.random()*(n-1))|0))%n;let i=s;for(let j=0;j<n;j++){const c=(s+j)%n;if(k[c].paused||k[c].ended){i=c;break;}}lastV[kind]=i;
+ try{const a=k[i];a.currentTime=0;const pr=a.play();if(pr&&pr.catch)pr.catch(()=>{});}catch(e){}}
+function surface(){cell(Math.floor(P.x),Math.floor(P.y));const sq=(CODE>>4)&3;if(sq===3)return 'water';if(sq)return 'rock';const l=CODE&7;return l<=1?'water':l===2?'sand':l===3?'grass':l<=5?'leaf':'rock';}
+/* ===== player ===== */
+const P={x:0.5,y:0.5,a:0,hp:100};
+let lavaAcc=0,VIEW=32,mapZoom=0,mapState=0,hudOn=false; // mapState 0 off / 1 / 2 / 3 = zoom 1,4,16 cells per pixel; hudOn = debug text only
+function blocked(ix,iy){cell(ix,iy);if(((CODE>>3)&1)===1||((CODE&7)===6&&((CODE>>7)&1)===1))return true; // walls and deep cave liquid block; the deep swamp can be crossed (slowly)
+return OB===4&&(VB>>4)>=10;} // blocked: walls, boulders. Open (no collision): ALL trees, small rocks, grass, swamp
+function free(x,y){const r=0.2;return !blocked(Math.floor(x-r),Math.floor(y-r))&&!blocked(Math.floor(x+r),Math.floor(y-r))&&!blocked(Math.floor(x-r),Math.floor(y+r))&&!blocked(Math.floor(x+r),Math.floor(y+r));}
+function place(x,y){for(let rad=0;rad<=40;rad++)for(let dy=-rad;dy<=rad;dy++)for(let dx=-rad;dx<=rad;dx++){
+ if(Math.max(Math.abs(dx),Math.abs(dy))!==rad)continue;const px=Math.floor(x)+dx+0.5,py=Math.floor(y)+dy+0.5;if(free(px,py)){P.x=px;P.y=py;return;}}
+ P.x=x;P.y=y;}
+function resetGen(){genReset();WIN.ready=false;}
+function teleport(cx,cy,x,y){const kx=Math.floor(x/CH),ky=Math.floor(y/CH);OX=wrapC(cx+kx);OY=wrapC(cy+ky);resetGen();place(x-kx*CH,y-ky*CH);} // chunk (f64 integers) + cell inside it
+function rebase(){const kx=Math.floor(P.x/CH),ky=Math.floor(P.y/CH);OX=wrapC(OX+kx);OY=wrapC(OY+ky);P.x-=kx*CH;P.y-=ky*CH;entShift(kx*CH,ky*CH);resetGen();} // floating origin: keep the local numbers small
+/* ===== URL (chunk coordinates wrap at +-2^50: closed world): #v=11&seed=..&b=DDWWSGGGTTRRM&r0=..&R=..&cx=..&cy=..&x=..&y=..&a=.. (cx,cy = origin chunk, x,y = local cell) ===== */
+function applyHash(){const q=new URLSearchParams(location.hash.slice(1));
+ const n=(k,d,lo,hi)=>{const v=parseFloat(q.get(k));return isFinite(v)?Math.min(hi,Math.max(lo,v)):d;};
+ SEED=n('seed',SEED>>>0,0,4294967295)|0;R0=n('r0',R0,10,100000);RR=Math.max(R0+10,n('R',RR,20,1000000));
+ OX=wrapC(Math.floor(n('cx',0,-4503599627370496,4503599627370496)));OY=wrapC(Math.floor(n('cy',0,-4503599627370496,4503599627370496)));resetGen();R0|=0;RR|=0;
+ if(q.has('x')&&q.has('y')){P.a=n('a',P.a,-1e4,1e4);place(n('x',0,-1e9,1e9),n('y',0,-1e9,1e9));}else place(0.5,0.5);}
+function writeHash(){try{history.replaceState(null,'','#v='+GEN_VERSION+'&seed='+(SEED>>>0)+'&r0='+R0+'&R='+RR+'&cx='+OX+'&cy='+OY+'&x='+P.x.toFixed(1)+'&y='+P.y.toFixed(1)+'&a='+P.a.toFixed(2));}catch(e){}}
+/* ===== render: 360x240 raycaster. textured floor/walls + sprite planes (billboard | cross + | cross x) ===== */
+const cv=document.getElementById('v'),ctx=cv.getContext('2d'),col=[0,0,0];
+let W=360,H=240,HZ=120,img,buf,skyRow,RX,RY,ZB,LZ,LT,LB;
+/* ===== ENGRAVING PASS (Jun Suemi / Wizardry pen-and-ink look): the 5-grey frame is re-drawn as ink on warm paper at HS x resolution:
+   tone -> diagonal hatching -> cross hatching -> solid black, stipple in the highlights, a thin ink line where the tone jumps, dark vignette. ===== */
+let ENG=true,HS=1,himg=null,hbuf=null,LUMA=null,EDG=null;
+const bc=document.createElement('canvas'),bctx=bc.getContext('2d',{willReadFrequently:true});
+const INKPK=(255<<24)|(15<<16)|(17<<8)|20,PAPERPK=(255<<24)|(184<<16)|(206<<8)|214,NZ=new Uint8Array(65536),HMASK=new Uint16Array(6);
+for(let i=0;i<65536;i++)NZ[i]=(Math.random()*256)|0;
+for(let l=1;l<6;l++)for(let Y=0;Y<4;Y++)for(let X=0;X<4;X++){const a=(X+Y)&3,b=(X-Y)&3;const on=l===5||a===0||(l>=2&&a===2)||(l>=3&&b===0)||(l>=4&&b===2);if(on)HMASK[l]|=1<<(Y*4+X);} // lines every 4th px; each level adds a set (diagonal, tighter diagonal, cross, tighter cross)
+function engraveInit(){HS=Math.max(1,Math.min(4,Math.round(720/H)));bc.width=W;bc.height=H;cv.width=W*HS;cv.height=H*HS;himg=ctx.createImageData(W*HS,H*HS);hbuf=new Uint32Array(himg.data.buffer);LUMA=new Uint8Array(W*H);EDG=new Uint8Array(W*H);}
+function engrave(){const w=W,h=H,S=HS,Wd=w*S,id=bctx.getImageData(0,0,w,h),src=new Uint32Array(id.data.buffer),THR=85;
+ for(let i=0;i<w*h;i++)LUMA[i]=src[i]&255;
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x,l=LUMA[i];let m=0; // ink line on the darker side of every strong tone step
+  if(x<w-1&&LUMA[i+1]-l>THR)m|=1;if(x>0&&LUMA[i-1]-l>THR)m|=2;if(y<h-1&&LUMA[i+w]-l>THR)m|=4;if(y>0&&LUMA[i-w]-l>THR)m|=8;EDG[i]=m;}
+ for(let y=0;y<h;y++){const vy=(y/h-0.5)*2;for(let x=0;x<w;x++){const i=y*w+x,vx=(x/w-0.5)*2;
+   let d=(1-LUMA[i]/204)*1.08+0.16*(0.1*vx*vx+vy*vy)+(NZ[((y&255)<<8)|(x&255)]-128)*0.0004; // tone (0 paper .. 1 black) + vignette + jitter
+   const lv=d>0.88?5:d>0.7?4:d>0.5?3:d>0.3?2:d>0.12?1:0,mk=HMASK[lv],m=EDG[i],dot=lv===0&&d>0.04&&NZ[((x*7+y*13)&255)<<8|((x*3+y*5)&255)]>246;
+   for(let sy=0;sy<S;sy++){const Y=y*S+sy,o=Y*Wd+x*S;for(let sx=0;sx<S;sx++){const X=x*S+sx;
+     const ink=lv===5||((mk>>(((Y&3)<<2)|(X&3)))&1)||(m&&(((m&1)&&sx===S-1)||((m&2)&&sx===0)||((m&4)&&sy===S-1)||((m&8)&&sy===0)))||(dot&&sx===(S>>1)&&sy===(S>>1));
+     hbuf[o+sx]=ink?INKPK:PAPERPK;}}}}}
+const pk=(r,g,b)=>(255<<24)|((b|0)<<16)|((g|0)<<8)|(r|0);
+const TS=new Float32Array(256);
+function setRes(w,h){W=w;H=h;HZ=h>>1;cv.width=w;cv.height=h;img=ctx.createImageData(w,h);buf=new Uint32Array(img.data.buffer);skyRow=new Uint32Array(HZ+1);RX=new Float32Array(w);RY=new Float32Array(w);ZB=new Float32Array(w);LZ=new Float32Array(w).fill(1e9);LT=new Float32Array(w);LB=new Float32Array(w);engraveInit();}
+setRes(360,240);
+for(let i=0;i<256;i++)TS[i]=Math.abs(i/255-0.5)*1.2;
+const CFR=8,CFG=8,CFB=8,CV=16;let OFR=0,OFG=0,OFB=0,FV=32;
+const cfog=c=>{if(c){FR=CFR;FG=CFG;FB=CFB;FV=CV;}else{FR=OFR;FG=OFG;FB=OFB;FV=VIEW;}}; // fog colour / range: dark and short inside the AREA, sky colour outdoors
+let FR=0,FG=0,FB=0,DX=1,DY=0,PLX=0,PLY=0.66,PL=0.66,PL2=0.4356; // PL: camera plane length (vertical FOV kept constant)
+function shade(tx,cb,f,plain,m){const r=tx&255,g=(tx>>8)&255,b=(tx>>16)&255,k=(1-f)*m; // no climate tint: pure greys fading into the fog
+ return pk(Math.min(255,r*k+FR*f),Math.min(255,g*k+FG*f),Math.min(255,b*k+FB*f));}
+/* objects: no collision. w,h in cells (quad size; BLACKMAGIC props: tree 1, rock .5, tall grass .25 high) */
+const OBJ=[null,{t:T_GWS,w:1,h:0.5,m:3},{t:T_THORN,w:0.6,h:1.4,m:1},{t:T_TREE,w:1,h:1,m:2},{t:T_ROCK,w:1,h:0.5,m:1},{t:T_GWD,w:1,h:0.5,m:2}];
+const MAXO=8192,OXA=new Float32Array(MAXO),OYA=new Float32Array(MAXO),ODA=new Float32Array(MAXO),OTA=new Uint8Array(MAXO),OCA=new Uint8Array(MAXO),OFA=new Uint8Array(MAXO),OIA=new Uint8Array(MAXO),OVA=new Uint8Array(MAXO),ord=[];
+const EX=new Float64Array(4),EY=new Float64Array(4),HM=new Float64Array(4),THORN_OPEN=8*Math.PI/180,MODES=['OFF','AUTO','ALL BILLBOARD','ALL CROSS +','ALL CROSS X','ALL BILLBOARD+CROSS'];
+let objN=0,segN=0,OBJMODE=1,showGrass=true,OMS=0,MS=0,FPS=60;
+/* one textured vertical plane A->B (u0..u1 of the texture); every mode is built from these */
+function seg(ax,ay,bx,by,u0,u1,tex,qh,cb,fl){
+ segN++;TN=tex.length>4096?128:tex.length>1024?64:32; // texture size: 32 (world, fx, items) or 64 (monsters)
+ let vx1=ax-P.x,vy1=ay-P.y,vx2=bx-P.x,vy2=by-P.y,z1=vx1*DX+vy1*DY,z2=vx2*DX+vy2*DY;
+ if(z1<0.05&&z2<0.05)return;
+ if(z1<0.05){const t=(0.05-z1)/(z2-z1);vx1+=(vx2-vx1)*t;vy1+=(vy2-vy1)*t;z1=0.05;}
+ else if(z2<0.05){const t=(0.05-z2)/(z1-z2);vx2+=(vx1-vx2)*t;vy2+=(vy1-vy2)*t;z2=0.05;}
+ const s1=(1+(vx1*PLX+vy1*PLY)/PL2/z1)*(W/2),s2=(1+(vx2*PLX+vy2*PLY)/PL2/z2)*(W/2);
+ const xa=Math.max(0,Math.floor(Math.min(s1,s2))-1),xb=Math.min(W-1,Math.ceil(Math.max(s1,s2))+1);
+ const dx=bx-ax,dy=by-ay,wx=ax-P.x,wy=ay-P.y;
+ for(let x=xa;x<=xb;x++){
+  const rx=RX[x],ry=RY[x],den=rx*dy-ry*dx;if(den===0)continue;
+  const t=(wx*dy-wy*dx)/den;if(t<0.05||t>=ZB[x]||t>=VIEW)continue;
+  const u=(wx*ry-wy*rx)/den;if(u<0||u>1)continue;
+  let uu=u0+(u1-u0)*u;if(fl)uu=1-uu;
+  const tx=Math.min(TN-1,(uu*TN)|0),lh=H/t*qh,yb=HZ+HZ/t-ZOFF*H/t,yt=yb-lh,q=Math.min(1,t/FV),f=q*Math.sqrt(q),lz=LZ[x];
+  const y0=Math.max(0,Math.ceil(yt)),y1=Math.min(H-1,Math.floor(yb)-1);
+  for(let y=y0;y<=y1;y++){if(t>lz&&y>=LT[x]&&y<=LB[x])continue; // hidden behind the entrance lintel
+  const v=Math.min(TN-1,((y-yt)/lh*TN)|0),tp=tex[v*TN+tx];if(tp!==0)buf[y*W+x]=shade(tp,cb,f,0,1);}
+ }
+}
+function treeTex(l,vb){return l===5?((vb&7)===0?T_TREE:T_PINE):((vb&7)===0?T_PINE:T_TREE);} // l = forest letter: conifer forest (5) / withered forest (4)
+function drawObjects(){
+ const rad=Math.min(32,VIEW),r2=rad*rad,bx=Math.floor(P.x),by=Math.floor(P.y);let n=0;
+ for(let j=-rad;j<=rad;j++)for(let i=-rad;i<=rad;i++){
+  if(i*i+j*j>r2)continue;
+  cell(bx+i,by+j);if(OB===0||((OB===1||OB===5)&&!showGrass))continue;
+  const ox=bx+i+0.5,oy=by+j+0.5,vx=ox-P.x,vy=oy-P.y,z=vx*DX+vy*DY;if(z<0.1||n>=MAXO)continue;
+  const hp=OBJ[OB].w*1.1/(PL*z)*(W/2),sx=(1+(vx*PLX+vy*PLY)/PL2/z)*(W/2);
+  if(sx+hp<0||sx-hp>W)continue;
+  OXA[n]=ox;OYA[n]=oy;ODA[n]=vx*vx+vy*vy;OTA[n]=OB;OCA[n]=CODE&7;OFA[n]=((bx+i)*31+(by+j)*17)&1;OVA[n]=VB;OIA[n]=((CODE&7)===6)?1:((CODE&64)?2:0);ord[n]=n;n++;
+ }
+ ord.length=n;ord.sort((a,b)=>ODA[b]-ODA[a]);objN=n;segN=0;const ML=entList();let mi=0; // far to near (monsters / bolts / items are merged into this order)
+ for(let k=0;k<n;k++){
+  while(mi<ML.length&&ML[mi].d>ODA[ord[k]])drawEnt(ML[mi++]);
+  const id=ord[k],o=OBJ[OTA[id]],ox=OXA[id],oy=OYA[id],cb=OCA[id],fl=OFA[id],md=OBJMODE===1?o.m:OBJMODE-1;cfog(OIA[id]===1);
+  let tex=o.t,qh=o.h,hw=o.w/2;const vb=OVA[id],sz=(vb>>4)/15;
+  if(OTA[id]===3){tex=treeTex(cb,vb);const sc=0.6+sz*0.9;qh*=(tex===T_PINE?1.25:tex===T_PALM?1.2:tex===T_BIRCH?1.05:1)*sc;hw*=0.75+0.25*sc;} // low tree = blocks, tall tree = open below
+  else if(OTA[id]===4){const big=(vb>>4)>=10;tex=big?(OIA[id]===2?T_BOULDERB:T_BOULDER):OIA[id]>0?T_ROCKB:T_ROCK;qh*=big?2.0:0.7+sz*0.5;hw*=big?1.1:0.9;} // boulder = solid
+  else if(OTA[id]===1||OTA[id]===5){const dn=OTA[id]===5,tall=(vb&1)===1;tex=tall?(dn?T_GTD:T_GTW):(dn?T_GWD:T_GWS);qh=tall?0.8:0.5;hw=tall?0.4:0.58;} // two grass kinds: tall tuft / wide fan
+  if(md===1){const rx=PLX/PL*hw,ry=PLY/PL*hw;seg(ox-rx,oy-ry,ox+rx,oy+ry,0,1,tex,qh,cb,fl);continue;} // always the same face
+  const pl=md===2||md===4,op=md===4?THORN_OPEN:0,d1x=pl?1:0.7071,d1y=pl?0:0.7071,d2x=pl?-Math.sin(op):0.7071,d2y=pl?Math.cos(op):-0.7071; // the dead branch's cross is opened by THORN_OPEN (8 deg)
+  EX[0]=ox-d1x*hw;EX[1]=ox+d1x*hw;EX[2]=ox-d2x*hw;EX[3]=ox+d2x*hw;
+  EY[0]=oy-d1y*hw;EY[1]=oy+d1y*hw;EY[2]=oy-d2y*hw;EY[3]=oy+d2y*hw;
+  for(let h=0;h<4;h++){const mx=(ox+EX[h])*0.5-P.x,my=(oy+EY[h])*0.5-P.y;HM[h]=mx*mx+my*my;}
+  for(let c=0;c<4;c++){if(md===4&&c===2){const rx=PLX/PL*hw,ry=PLY/PL*hw;seg(ox-rx,oy-ry,ox+rx,oy+ry,0,1,tex,qh,cb,fl);} // billboard between the far and near arms
+   let b=0,bd=-1;for(let h=0;h<4;h++)if(HM[h]>bd){bd=HM[h];b=h;}HM[b]=-2; // 4 half-planes, far first
+   if(b&1)seg(ox,oy,EX[b],EY[b],0.5,1,tex,qh,cb,fl);else seg(EX[b],EY[b],ox,oy,0,0.5,tex,qh,cb,fl);}
+ }
+ while(mi<ML.length)drawEnt(ML[mi++]);
+}
+const CAVEH=2,CAVEK=2*CAVEH-1; // cave ceiling height (cells); building ceilings stay at 1, doorways are 1 high
+function ceilPx(x,y,rx,ry,maxd){ // the ceiling pixel of row y if it is nearer than maxd: pass 0 = building ceiling (height 1), pass 1 = cave ceiling (height CAVEH). A nearer ceiling hides lintel / wall pixels above it
+ const k0=HZ/(HZ-y+0.5);
+ for(let ps=0;ps<2;ps++){const rd=ps?k0*CAVEK:k0;if(rd>=maxd||rd>=VIEW)continue;const fx=P.x+rx*rd,fy=P.y+ry*rd,ix=Math.floor(fx),iy=Math.floor(fy);cell(ix,iy);if(!AREAC(CODE)||((CODE&7)===6)!==(ps===1))continue;
+  cfog(1);const q=Math.min(1,rd/FV);buf[y*W+x]=shade((ps?T_CEIL:T_BCEIL)[(((fy-iy)*32)|0)*32+(((fx-ix)*32)|0)],CB,q*Math.sqrt(q),1,0.9);return true;}
+ return false;}
+function render(){
+ DX=Math.cos(P.a);DY=Math.sin(P.a);PLX=-DY*PL;PLY=DX*PL;
+ const cc=climateAt(P.x,P.y),top=skyAt(cc,0),hor=skyAt(cc,1);cell(Math.floor(P.x),Math.floor(P.y));const PIN=AREAC(CODE),PCV=(CODE&7)===6; // PIN: the player stands inside the mountain AREA
+ OFR=hor[0];OFG=hor[1];OFB=hor[2];FR=OFR;FG=OFG;FB=OFB;
+ for(let y=0;y<=HZ;y++){const t=y/HZ;skyRow[y]=pk(top[0]+(hor[0]-top[0])*t,top[1]+(hor[1]-top[1])*t,top[2]+(hor[2]-top[2])*t);}
+ const outpk=pk(OFR,OFG,OFB),cavepk=pk(CFR,CFG,CFB);
+ for(let x=0;x<W;x++){
+  const cam=2*x/W-1,rx=DX+PLX*cam,ry=DY+PLY*cam;RX[x]=rx;RY[x]=ry;
+  let mx=Math.floor(P.x),my=Math.floor(P.y);
+  const ddx=rx===0?1e30:Math.abs(1/rx),ddy=ry===0?1e30:Math.abs(1/ry);
+  let sx,sy,sdx,sdy;
+  if(rx<0){sx=-1;sdx=(P.x-mx)*ddx;}else{sx=1;sdx=(mx+1-P.x)*ddx;}
+  if(ry<0){sy=-1;sdy=(P.y-my)*ddy;}else{sy=1;sdy=(my+1-P.y)*ddy;}
+  let hit=false,side=0,perp=0,prevIn=PIN,pvCave=PCV,cOn=PIN,inFace=false,lp=0,lwh=1,lu=0,lcb=0,lside=0,lbw=false; // cOn: this column sees ceiling (inside, or looked through an entrance)
+  for(;;){
+   if(sdx<sdy){perp=sdx;sdx+=ddx;mx+=sx;side=0;}else{perp=sdy;sdy+=ddy;my+=sy;side=1;}
+   if(perp>=VIEW)break;
+   cell(mx,my);if((CODE>>3)&1){hit=true;inFace=prevIn;break;}
+   const isIn=AREAC(CODE),isCv=isIn&&(CODE&7)===6;
+   if(isIn&&!prevIn){cOn=true;if(!lp){lp=perp;lbw=(CODE&7)!==6;lcb=CB;lside=side;let hv=VB;if(!lbw){const ex=side===0?0:1,ey=side===0?1:0;for(let s=-1;s<=1;s+=2){cell(mx+ex*s,my+ey*s);if((CODE&8)&&(CODE&7)===6&&VB<hv)hv=VB;}cell(mx,my);} lwh=lbw?1.1:CAVEH+hv/255; // lintel top = the lower of the two wall cells beside the doorway: it never rises above the wall line
+    let wx=side===0?P.y+perp*ry:P.x+perp*rx;lu=wx-Math.floor(wx);}} // crossed an entrance from outside: the rock above the doorway
+   else if(isCv&&!pvCave&&!lp){lp=perp;lbw=false;lcb=CB;lside=side;lwh=CAVEH;let wx=side===0?P.y+perp*ry:P.x+perp*rx;lu=wx-Math.floor(wx);} // from the roofed gate passage (ceiling 1) into the cave (ceiling CAVEH): rock slab above the doorway
+   else if(!isIn&&prevIn&&pvCave&&!lp){lp=perp;lbw=false;lcb=CB;lside=side;lwh=CAVEH;let wx=side===0?P.y+perp*ry:P.x+perp*rx;lu=wx-Math.floor(wx);} // leaving the cave through the doorway: the same slab, seen from inside (doorway height 1)
+   prevIn=isIn;pvCave=isCv;
+  }
+  ZB[x]=hit?perp:1e9;
+  let wy0=HZ,wy1=HZ-1,wtx=0,wcb=0,wf=0,wsh=1,lh=0,wtop=0,wtex=null,ly0=0,ly1=-1,lt=0,lb=1,ltx=0,lf=0,lsh=1;
+  if(lp){lt=HZ-(2*lwh-1)*HZ/lp;lb=HZ-HZ/lp;ly0=Math.max(0,Math.ceil(lt));ly1=Math.min(HZ-1,Math.floor(lb));ltx=Math.min(31,(lu*32)|0);const q=Math.min(1,lp/VIEW);lf=q*Math.sqrt(q);lsh=lside?0.75:1;LZ[x]=lp;LT[x]=ly0;LB[x]=ly1;}else LZ[x]=1e9;
+  if(hit){const l=CODE&7;wtex=(CODE>>7)?(l===6?T_PILLAR:(CODE&64)?T_STONE:T_BWALL):l===4?(CB<85?T_PINEWALL:CB>170?T_JUNGLE:T_FOREST):WALLTEX[l];wcb=CB;cfog(inFace);const q=Math.min(1,perp/FV);wf=q*Math.sqrt(q);wsh=side?0.75:1;
+   let wx=side===0?P.y+perp*ry:P.x+perp*rx;wx-=Math.floor(wx);wtx=Math.min(31,(wx*32)|0);
+   const wh=l!==6?(inFace?1:(CODE&64)?1.7:1.1):inFace?CAVEH:CAVEH+VB/255; // buildings: the inner face reaches the ceiling, the outer face 1.1, castle walls 1.7 // inner face reaches exactly the ceiling (1.0); the outer face rises like a hill
+   lh=H/perp*wh;const yb=HZ+HZ/perp;wtop=yb-lh;wy0=Math.max(0,Math.floor(wtop));wy1=Math.min(H-1,Math.floor(yb));}
+  for(let y=0;y<H;y++){
+   if(y>=ly0&&y<=ly1){if(cOn&&y<HZ&&ceilPx(x,y,rx,ry,lp))continue;cfog(0);const v=Math.min(31,Math.max(0,((y-lt)/(lb-lt)*32)|0));buf[y*W+x]=shade((lbw?T_BWALL:T_CAVEWALL)[v*32+ltx],lcb,lf,0,lsh);continue;}
+   if(hit&&y>=wy0&&y<=wy1){if(cOn&&y<HZ&&ceilPx(x,y,rx,ry,perp))continue;cfog(inFace);const v=Math.min(31,((y-wtop)/lh*32)|0);buf[y*W+x]=shade(wtex[v*32+wtx],wcb,wf,inFace?1:0,wsh);continue;}
+   if(y<HZ){
+    if(cOn){if(ceilPx(x,y,rx,ry,1e9))continue; // ceiling exists only above AREA cells
+     if(HZ/(HZ-y+0.5)*(pvCave?CAVEK:1)>=VIEW){buf[y*W+x]=prevIn?cavepk:skyRow[y];continue;}}
+    buf[y*W+x]=skyRow[y];continue;}
+   const rd=HZ/(y-HZ+0.5);
+   if(rd>=VIEW){buf[y*W+x]=prevIn?cavepk:outpk;continue;}
+   const fx=P.x+rx*rd,fy=P.y+ry*rd,ix=Math.floor(fx),iy=Math.floor(fy);cell(ix,iy);
+   const sp=(CODE>>4)&3,inC=AREAC(CODE),ft=sp===1?T_ICE:sp===2?T_LAVA:sp===3?(((CODE>>7)&1)?FLOORTEX[0]:FLOORTEX[1]):(CODE&7)===6?((CODE>>6)&1?T_DIRT:T_CFLOOR):((CODE&64)&&(CODE&7)===5)?T_CFLOOR:((CODE&192)&&(CODE&7)<=4)?(((CODE>>7)&1)?(((CODE>>6)&1)?T_COURT:T_BFLOOR):((CODE&7)<=1?T_BRIDGE:T_ROAD)):FLOORTEX[CODE&7];cfog(inC);const q=Math.min(1,rd/FV);
+   buf[y*W+x]=shade(ft[(((fy-iy)*32)|0)*32+(((fx-ix)*32)|0)],CB,q*Math.sqrt(q)*(sp===2?0.35:1),(sp||inC||((CODE&64)&&(CODE&7)===5))?1:0,1); // magma stays visible in the dark
+  }
+ }
+ const t0=performance.now();
+ if(OBJMODE)drawObjects();else{objN=0;segN=0;}
+ OMS=OMS*0.9+(performance.now()-t0)*0.1;
+ bctx.putImageData(img,0,0);entFx(bctx,bc,0);
+ if(ENG){engrave();ctx.putImageData(himg,0,0);}else{ctx.imageSmoothingEnabled=false;ctx.drawImage(bc,0,0,W*HS,H*HS);}
+ ctx.save();ctx.scale(HS,HS);entFx(ctx,cv,1);ctx.restore();
+}
+/* minimap: stride 1 / 4 / 16 cells per pixel (2x2 screen px each) */
+const mm=document.getElementById('mm'),mctx=mm.getContext('2d'),mimg=mctx.createImageData(64,64),mbuf=new Uint32Array(mimg.data.buffer);
+function drawMap(){const st=[1,4,16][mapZoom],bx=Math.floor(P.x),by=Math.floor(P.y);
+ FAST=st>1;for(let j=0;j<64;j++)for(let i=0;i<64;i++){const c=sample(bx+(i-32)*st,by+(j-32)*st);colorOf(c,SC,SV,col);mbuf[j*64+i]=pk(col[0],col[1],col[2]);}FAST=false; // zoomed-out map skips entrances/pillars
+ for(let j=31;j<33;j++)for(let i=31;i<33;i++)mbuf[j*64+i]=pk(255,0,0);
+ mctx.putImageData(mimg,0,0);}
+/* ===== update: movement, environment damage, level ===== */
+const K={};let envAcc=0,info={r:0,lv:1};
+function update(dt){
+ entUpdate(dt);
+ P.a+=(((K.ArrowRight||K.KeyD)?1:0)-((K.ArrowLeft||K.KeyA)?1:0))*2.2*dt;
+ const f=((K.ArrowUp||K.KeyW)?1:0)-((K.ArrowDown||K.KeyS)?1:0);
+ cell(Math.floor(P.x),Math.floor(P.y));const sp=4.5*dt*(EN.gd?0.55:1)*((CODE&7)===0&&!((CODE>>4)&3)?0.4:1),stf=(K.KeyL?1:0)-(K.KeyJ?1:0),mvx=(Math.cos(P.a)*f-Math.sin(P.a)*stf)*sp,mvy=(Math.sin(P.a)*f+Math.cos(P.a)*stf)*sp,ox0=P.x,oy0=P.y;
+ if(mvx&&free(P.x+mvx,P.y))P.x+=mvx;
+ if(mvy&&free(P.x,P.y+mvy))P.y+=mvy;
+ stepAcc+=Math.hypot(P.x-ox0,P.y-oy0);if(stepAcc>=1.1){stepAcc-=1.1;step(surface());}
+ const r=Math.hypot(OX*CH+P.x,OY*CH+P.y);
+ info={r,lv:1+Math.floor(Math.sqrt(r/R0))};
+ cell(Math.floor(P.x),Math.floor(P.y));if(((CODE>>4)&3)===2){lavaAcc+=dt;if(lavaAcc>=0.5){lavaAcc-=0.5;P.hp-=5;}if(P.hp<=0){P.hp=100;lavaAcc=0;teleport(0,0,0.5,0.5);}}else lavaAcc=0; // magma burns
+ envAcc+=dt;
+ if(envAcc>=ENVT){envAcc-=ENVT;P.hp=Math.min(100,P.hp+ENVREC);} // slow recovery (magma still burns)
+}
+const dlg=document.getElementById('dlg'),dS=document.getElementById('dSeed'),dX=document.getElementById('dX'),dY=document.getElementById('dY'),dM=document.getElementById('dMsg');
+const dCX=document.getElementById('dCX'),dCY=document.getElementById('dCY');
+function openLoc(){for(const k in K)K[k]=0;const kx=Math.floor(P.x/CH),ky=Math.floor(P.y/CH);dS.value=String(SEED>>>0);dCX.value=String(OX+kx);dCY.value=String(OY+ky);dX.value=(P.x-kx*CH).toFixed(1);dY.value=(P.y-ky*CH).toFixed(1);dM.textContent='';dlg.style.display='block';dS.focus();}
+function closeLoc(){dlg.style.display='none';if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();}
+function doMove(){const sd=Number(dS.value),cx=Number(dCX.value),cy=Number(dCY.value),x=Number(dX.value),y=Number(dY.value),LIM=4503599627370496; // any integer chunk up to 2^52; it wraps into [-2^50, 2^50)
+ if([dS,dCX,dCY,dX,dY].some(e=>String(e.value).trim()==='')||!Number.isInteger(sd)||sd<0||sd>4294967295||!Number.isInteger(cx)||!Number.isInteger(cy)||Math.abs(cx)>LIM||Math.abs(cy)>LIM||!isFinite(x)||!isFinite(y)||Math.abs(x)>1e9||Math.abs(y)>1e9){dM.textContent='SEED 0-4294967295, CHUNK X/Y integer (wraps at +-2^50), X/Y number (cell inside the chunk)';return;}
+ if((sd|0)!==SEED)SEED=sd|0;teleport(cx,cy,x,y);closeLoc();} // world cell = chunk*64 + X
+document.getElementById('dGo').addEventListener('click',doMove);document.getElementById('dCancel').addEventListener('click',closeLoc);
+const LOC=[0,400,1000,2000,3000];let locI=0;
+const ACT={
+ loc(){openLoc();}, // LOCATE: dialog (SEED, X, Y) + MOVE
+ map(){mapState=(mapState+1)%4;mapZoom=Math.max(0,mapState-1);mm.style.display=mapState?'block':'none';if(mapState)drawMap();},
+ vm(){VIEW=Math.max(16,VIEW-8);},vp(){VIEW=Math.min(32,VIEW+8);},
+ snd(){SND=!SND;if(SND)audioInit();},
+ obj(){OBJMODE=(OBJMODE+1)%6;},grass(){showGrass=!showGrass;},
+ pad(){PADON=!PADON;document.body.classList.toggle('nopad',!PADON);layout();},
+ hpm(){UI.hp=UI.hp==='AUTO'?'ALWAYS':UI.hp==='ALWAYS'?'OFF':'AUTO';},
+ asp(){ASPECT=ASPECT==='AUTO'?'4:3':ASPECT==='4:3'?'16:9':'AUTO';layout();},
+ hud(){hudOn=!hudOn;hud.style.display=hudOn?'block':'none';}
+};
+const KEYACT={BracketLeft:'vm',BracketRight:'vp',KeyM:'map',KeyH:'hud',KeyO:'obj',KeyN:'snd',KeyP:'pad',KeyG:'grass'};
+function onKey(c){const d={Digit1:0,Digit2:400,Digit3:1000,Digit4:2000,Digit5:3000};
+ if(c in d){locI=LOC.indexOf(d[c]);place(Math.cos(P.a)*d[c],Math.sin(P.a)*d[c]);}
+ else if(KEYACT[c])ACT[KEYACT[c]]();}
+const hud=document.getElementById('hud'),cmp=document.getElementById('cmp');
+function drawHud(){const ix=Math.floor(P.x),iy=Math.floor(P.y);cell(ix,iy);
+ const t=RANK[CODE&7]+(((CODE>>4)&3)===1?' ice':((CODE>>4)&3)===2?' lava':((CODE>>4)&3)===3?' water':'')+((((CODE>>4)&3)>=2&&(CODE&7)===6&&((CODE>>7)&1)&&!((CODE>>3)&1))?' (deep)':'')+(((CODE>>3)&1)?((CODE>>7)?' pillar':' wall'):'')+(((CODE&64)&&(CODE&7)===6)?' ENTRANCE':'')+((((CODE&192)&&(CODE&7)<=4)?((CODE>>7)&1?((CODE>>3)&1?((CODE>>6)&1?' STONE WALL':' BUILDING WALL'):((CODE>>6)&1?' COURTYARD':' ROOFED FLOOR')):((CODE&7)<=1?' BRIDGE':' ROAD')):''))+(((CODE&64)&&(CODE&7)===5)?' ROCK STATE (mountain too small)':'')+((CODE&7)===6?'  [AREA: cave, ceiling]':'  [outdoors: sky]');
+ hud.textContent='GEN'+GEN_VERSION+'  POS '+P.x.toFixed(1)+', '+P.y.toFixed(1)+'\nCHUNK '+(OX+Math.floor(ix/CH))+','+(OY+Math.floor(iy/CH))+'  SEC '+Math.floor((OX+Math.floor(ix/CH))/SECC)+','+Math.floor((OY+Math.floor(iy/CH))/SECC)+'  r='+info.r.toFixed(0)+'\nLV '+info.lv+'\nCELL '+t+'\nHP '+P.hp+'\nRES '+W+'x'+H+' '+ASPECT+'  VIEW '+VIEW+'  SND '+(SND?'ON':'OFF')+'  GEN v'+GEN_VERSION+'\nOBJ '+MODES[OBJMODE]+(showGrass?'':' (no grass)')+'  n='+objN+' seg='+segN+'\nMS '+MS.toFixed(1)+' (obj '+OMS.toFixed(1)+')  '+FPS.toFixed(0)+'fps';}
+/* ===== MONSTERS: sprites (5 greys #000 #333 #666 #999 #ccc), spawning, state machines, hammer, drops ===== */
+const SPD={"zw": ".............................................................................03320..........................33...30........................03.....20......................203.....32......................00223.3320......................20212.0320......................00..0.2320.......................03.202220......................0023000000......................2202.0.00200..................0244203.3022220.................024222000022220................02022220200220020...............00000220000220022............2302303022000222033222..........3.22302022202222333.330...........03.00222202222003...0..........0030.022220202200.0..0...............00000000020...0.................0000000000......................0101100111......................01100110110.....................11111101130.....................111300111310....................11130.013130....................11330..03331....................11330..03331....................01110..01310....................11110..01110....................0000..102100..........", "zm": "..............................................................................02330..........................03...33........................02.....30.......................23.....302......................0233.32200......................0230.21202......................0232.0..00......................022202.30.......................0000003200....................00200.0.2022...................0222203.3024420.................022220000222420................02002200202222020...............22002200002200000.............2223302220002203032032.........033.33322220222020322.3.........0...30022220222200.30...........0..0.002202022220.0300............0...02000000000......................0000000000......................1110011010.....................01101100110.....................03110111111....................013111003111....................031310.03111....................13330..03311....................13330..03311....................01310..01110....................01110..01111....................001201..0000..........", "b0": "..........0000...00.....................0333333333330..................011133333313330330.............01003311111133303330............01113331333333110133............310413133113114001130...........111401000001104033333...........010003111113000113133.........00100003033030110111310.........11111000000000100111110.........11010010000034101111113.........00000003000013100111113.........1110..11111110000011100.........111...000000000020330110........101.01111100003333333110........00.033331110033133011310...........31133311111133111331...........013333311010111111110...........333331111011111110010..........0113111001001111100010..........0011101100....0000003...........01111310.....0000000............01113330.....00100..............0111113......011110.............0011010......001110.............001110..000000013330............001110000000000114021..........0013310000000000000000..........0330331000000000000000..........33333310000000000000............430143100....00000..............41014110....................", "b1": ".............00...0000.....................0333333333330...............033033313333331110.............03330333111111330010............33101133333313331110...........031100411311331314013...........333330401100000104111...........331311000311111300010...........01311101103033030000100.........01111100100000000011111.........31111110143000001001011.........31111100131000030000000.........00111000001111111..0111........011033020000000000...111........01133333330000111110.101........013110331330011133330.00.........13311133111111333113............011111111010113333310...........010011111110111133333...........0100011111001001113110...........3000000....0011011100............0000000.....01311110..............00100.....03331110.............011110......3111110.............011100......0101100............033310000000..011100...........120411000000000011100...........0000000000000000133100..........0000000000000001330330............00000000000001333333..............00000....001341034........................01141014....", "b2": ".0300000303033000030.............4003330330333333333300.........111130311333111133311330........41111111031131113310013330......011001114110000011140113330......011.0000031111130000111330.......4....01133333331010111333.............0043300400000111111..............0000000001001111330.............10100000001010133330.............0030000002010033333.............04300000300100113330..........0000300001310010333313.........00001133331000331333313........000000000000011233311110........00000001000001111111111........00000000000000111111110.........000001000...0001111032.2........0000113.....00000003330.........0000113......0011133330.........010111........001111110.........01001..........01111133.........01100..........01111133.........00111...........0111133....0000011111...........00103130....000110111............0001130......0411410000000000....001330.......000000000000000000.0133310........000000000000000000333333..........00000000000000013333333.....................000113433310.......................01141144.", "b3": "..................0333330.........................01333333...................00333033033030...............03331333333333330.............0333303333331113330.............33333111333311133130...........013130100133331333301...........11113000411111131114............1111000000010011010000..........01100000101333113311140.........01100100000030330311013.........01111110010000000000110...........1111100140000030.011............00111001310000300..............001111000113333113.............00001100000000001333............000001101100010111330..........000000011112100331310000........000000000111311333103334........0000110..011331113333310.......0000110.....0111131111113......0000100........00111111111......00010............000111110.....00110.............11001110......000110............1011100......0111110............000100.......041141000000000000001110........0000000000000000000133310..........0000000000000000333333...........0000000000000013330333...........0000000000000113433410............0000000000001141141....", "b4": "44................0333330.......444...............01333333.......444.........00333033033030.......444.....03331333333333330........444..0333303333331113330.........444.33333111333311133130.........44413130100133331333301..........444113000411111131114............4441000000010011010000..........04440000101333113311140.........01444100000030330311013.........01144410010000000000110...........1144400140000030.011............00144401310000300..............001114440113333113.............00001104440000001333............000001104440010111330..........000000011144400331310000........000000000114441333103334........0000110..011444113333310.......0000110.....0144431111113......0000100........04441111111......00010............444111110.....00110.............14441110......000110............1044400......0111110............000444.......04114100000000000000111444......000000000000000000013331444........0000000000000000333333444........0000000000000013330333444........0000000000000113433410444.........0000000000001141141..44", "h0": "..............00............................33330..........................333333.........................13333333.......................11111113333.....................111112213330...................0110222220330......00......0....000020000110...000330......33000000110203033033333130......30311100031010200331133110......11331310001333033111111010......11133301010330013110111110......0001100100101011110010010.......00000.011000011000..00010.......00....00100001110.....................00100101110.....................00010101100.....................00010001100.....................00011011100.....................00011113110.....................00011113110.....................00110113110.....................00110033310.....................00110033310.....................00110033310.....................00110033310.......................110033000.......................1010130.0.......................0..003.........................000000000................00000000000000000000000...............0000000000.............", "h1": "................00............................03330...........................131113.........................03101130.......................113222313......................01103030330....................0031002000300...................0031022201000...................0300100033330..................13133310103133..................114300333343310................0144400033000430................0324440300444040................0444440300444400................044444110444443..................34444414444444..................42444113444440...................440030344440.....................00131110440.....................03131114040.....................03131133114.....................01333133110.....................01333133110.....................01333133110.....................01333133110.....................00333133100.......................0331331.0.......................0311331.0........................0.1030.......................00000000000.....................0033..0.030.......................333...3333.........", "hb": "...........11111.....11..................1111.........11................11111.11111....11...............11..11111111111.11..............1..111313131111.444.........4..11.11131313113114..341......4..1111.1333134331341.3111......4..11....13334311314..1311.......44444443141....344444....11....11.111444444.333.344411111.11..11.11334434433444...4431111111.11..11133444..4.......4444311...11.111314444..........33444411.111111133434.........33.3331311.11111134433..........43.3313141.111111433434.........43.313131111111144333344.......444.1313111111111131343344.....4434331313111.11.1111334443...4....441313311...1.111134444334444343.4.441311.......114333444444333.11441111.......111..3343444341.111..111..1.....111..13331413131111.1....11.....111.1113111144111..111.11........11.11111111141111.11.11.............111111111111.11...............11.1111111111.11................11...1111111..1..................1111111.441.11....................111111111.........................111111.............................................", "co": "..........................................................................................................................................222222222222....................222222222222..................4444444444443322................4444444444443322..............22444444333333443322............22444444333333443322..........223344444444443344443322........223344444444443344443322........224444443344443344444422........224444443344443344444422........224444443344443344444422........224444443344443344444422........224444443344443344444422........224444443344443344444422........224444443344443344444422........224444443344443344444422........223344443344443344443322........223344443344443344443322..........22334433333333443322............22334433333333443322..............2233444444443322................2233444444443322..................222222222222....................222222222222..........................................................................................................................................", "po": "..............................................................................2222............................2222............................2222............................2222..........................44444444........................44444444........................44444444........................44444444........................44444444........................44444444........................44444444........................44444444....................4444444444444444................4444444444444444..............11222222222222222211............11222222222222222211............22223333332222222222............22223333332222222222............22223333332222222222............22223333332222222222............22222222222222222222............22222222222222222222............11222222222222222211............11222222222222222211..............1122222222222211................1122222222222211....................11111111........................11111111............................................................................", "ha": "....................................................................................................................................................................................................444444444444444444444444........444444444444444444444444........222233333333333333333333........222233333333333333333333........222233333333333333333333........222233333333333333333333........222233333333333333333333........222233333333333333333333..................113311..........................113311..........................113311..........................113311..........................113311..........................113311..........................113311..........................113311..........................113311..........................113311..........................113311..........................113311..........................113311..........................113311..........................113311..........................113311............................................................................"}; // 32x32 sprites from sprite_assets_32x32_16color.json, quantised to 5 greys ('.' = transparent)
+// DEMON sprite: bat wings + horns layered around the Ogre's body frames.
+// d0..d4 keep the exact Ogre idle/walk/windup/strike/hurt frame sequence.
+SPD["d0"]=".........00.000..0...00..................0033333333..00...........0.......001333333000.......0....030....00301111330030....030....003300.01033133330303.003300.....01030030030311110313003010......02113011403000103033331120......02222300001111000133322220.....0002220100003031111110222000....0002221110000001011110222000...000122210001000310111132221000.033332220000000011011113222333300011233311331111100011003332110000112222112100000000331122221100.001122201011110033333112221100..001122202333110031301312221100..001112111113311113111311211100...0001110033331011111110111000....0000103333311011111010010000.....00033013110000111001033000......033..0011010...000033..330.......0...011130...00000.....0............011330...0000...................01111....01110..................00101....00110..................00110.00000333..................001100000001401.................013100000000000.................333310000000000.................33331000000000..................304310...000....................10411...................";
+SPD["d1"]=".........00...0..000.00..................00..3333333300...........0.......000333333100.......0....030....00303311113030....030....003300.31033333130300.003300.....01030031030111310303003010......02113333303100003011031120......02222333110011110000322220.....0002220111111303000010222000....0002220111101000000111222000...000122231111013000100012221000.033332223111101100000000222333300011233300110001111133113332110000112222113300000000121122221100.001122211333330011110102221100..001122213103130011333202221100..001112113111311113311111211100...0001110111111101333300111000....0000100101111101133333010000.....00033010011100001131033000......033...30000...0101100..330.......0.....00000...031110...0...............0000...033110..................01110....11110..................01100....10100..................33300000.01100.................104100000001100.................000000000001310.................000000000013333..................00000000013333....................000...013403...........................11401........";
+SPD["d2"]="......3000003330030..00...............00300303333330000...........0..11103003111331300.......0....030411110303113101030....030....0030101140300011403030003300.....01011000030113000313003010......02143001103333003013331120......02222330043040000111122220.....0002222130000001011133222000....0002222211000000110133022000...000122222210300002100333221000.033332222222030003010013302333300011233333000300031010331332110000112222220001333003313313221100.001122220000000001233111021100..001122220000010001111111221100..001112100000000001111111211100...0001110000100000011132211000....0000100001100..0000033010000.....00033000110...001133333000......033..01111.....011111..330.......0...0101.......11113...0............0100.......11113................0011.......01113.............0001111.......001310.............001011........00110..............01110000000...0130...............000000000000.03310...............00000000000003333................0000000000013333.........................00134330..........................01414......";
+SPD["d3"]=".........00......033300..................00......013300...........0.......00..0330300030.....0....030.....03033333330330...030....003300..00330333303030003300.....010300.3030113330331303010......02113001303101303033031120......02222331110041110311422220.....0002222111100001011000022000....0002222211000103311311402000...000122222110100003330111321000.033332222211111010000000102333300011233333311110100003301332110000112222222001101100030222221100.001122222001110013331322221100..001122222000100000001332221100..001112111000111100011331211100...0001110000001111033110001000....0000103000000113133303340000.....00033.00010.01331133310000......033..00011....111311113330.......0...00100.....01111111.0............000........0001110.............011.........110110..............0010........10110..............01110........00000..............04140000000000110...............000000000000013310................0000000000033333.................000000000033333..................000000000134340..................0000000011414........";
+SPD["d4"]=".....4...00......033300..............44..00......013300...........0...44..00..0330300030.....0....030.44..03033333330330...030....0033044.00330333303030003300.....01030443030113330331303010......02113441303101303033031120......02222344110041110311422220.....0002222144100001011000022000....0002222244400103311311402000...000122222144100003330111321000.033332222211441010000000102333300011233333311440100003301332110000112222222004401100030222221100.001122222001144013331322221100..001122222000104400001332221100..001112111000114400011331211100...0001110000001144033110001000....0000103000000114433303340000.....00033.00010.01441133310000......033..00011....144311113330.......0...00100.....04411111.0............000........4441110.............011.........144110..............0010........10440..............01110........00044..............041400000000001144..............0000000000000133144...............000000000003333344...............00000000003333344................00000000013434044................0000000011414..4.....";
+
+const G5=[0,51,102,153,204],PK5=v=>(255<<24)|(v<<16)|(v<<8)|v;
+for(const g of [['zw','zm'],['b0','b1','b2','b3','b4'],['d0','d1','d2','d3','d4'],['h0','h1'],['co'],['po']]){ // 1 sprite pixel = 1/32 cell: feet on the ground, centred (one integer shift per animation set, no resampling)
+ const s0=SPD[g[0]];let x0=32,x1=-1,y1=-1;for(let i=0;i<1024;i++)if(s0[i]!=='.'){const x=i&31,y=i>>5;if(x<x0)x0=x;if(x>x1)x1=x;if(y>y1)y1=y;}
+ const dx=Math.round(15.5-(x0+x1)/2),dy=31-y1;
+ for(const k of g){const t=SPD[k];let o='';for(let y=0;y<32;y++)for(let x=0;x<32;x++){const sx=x-dx,sy=y-dy;o+=(sx>=0&&sx<32&&sy>=0&&sy<32)?t[sy*32+sx]:'.';}SPD[k]=o;}}
+function up2(s){const g=(x,y)=>(x<0||y<0||x>31||y>31)?'.':s[y*32+x],o=new Array(4096); // 32x32 -> 64x64: Scale2x (EPX) edge-aware doubling + light/shade pass
+ for(let y=0;y<32;y++)for(let x=0;x<32;x++){const p=g(x,y),a=g(x,y-1),b=g(x+1,y),c=g(x-1,y),d=g(x,y+1);let e0=p,e1=p,e2=p,e3=p;
+  if(c===a&&c!==d&&a!==b)e0=a;if(a===b&&a!==c&&b!==d)e1=b;if(d===c&&d!==b&&c!==a)e2=c;if(b===d&&b!==a&&d!==c)e3=d;
+  const i=2*y*64+2*x;o[i]=e0;o[i+1]=e1;o[i+64]=e2;o[i+65]=e3;}
+ const h=(x,y)=>(x<0||y<0||x>63||y>63)?'.':o[y*64+x],r=new Array(4096);
+ for(let y=0;y<64;y++)for(let x=0;x<64;x++){let c=o[y*64+x];if(c!=='.'){let v=+c;
+  if(v>0){if(h(x-1,y-1)==='.'&&v<4)v++;else if(h(x+1,y+1)==='.'&&v>1)v--; // rim light on the upper-left edge, shade on the lower-right edge
+   if(y>52&&v>1&&((x+y)&1))v--;} // darker toward the feet (ground contact)
+  c=String(v);}r[y*64+x]=c;}
+ return r.join('');}
+for(const k of ['zw','zm','b0','b1','b2','b3','b4','d0','d1','d2','d3','d4','h0','h1'])SPD[k]=up2(SPD[k]); // monsters are 64x64 textures
+// Gargoyle sprite set removed; the demon now uses the winged d0..d4 animation.
+const SP={},SPF={}; // SP = normal texture, SPF = white silhouette (hit flash)
+for(const k in SPD){const s=SPD[k],n=s.length,a=new Uint32Array(n),f=new Uint32Array(n);for(let i=0;i<n;i++)if(s[i]!=='.'){a[i]=PK5(G5[+s[i]]);f[i]=PK5(204);}SP[k]=a;SPF[k]=f;}
+/* demon: 5 poses of 128x128 made from the supplied engraving (right frame = walk). 3 bits/pixel base64, value 5 = transparent. dw walk/idle, dr melee stance, dp punch, dc casting (arms raised), dh hurt */
+const DEMON128={"dw": "ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttptttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttNttttttttttttttttttttttttttttttttttttttttttttttttttttttpCSSJtttpFtttttttttttttttttttttttttttttttttttttttttttttttttttttJSbRJRQtpRNtttttttttttttttttttttttttttttttttttttttttttttttttttpJMbZBAAKJKAttttttttttttttttttttttttttttttttttttttttttttttttttttKTbaaIAAAIINtttttttttttttttttttttttttttttttttttttttttttttttttttpRCbTIAFtAABtttttttttBFtttttttttttttttttttttttttttttttttttttttttpIJTRRRJVttttttttttttpRtttttttttttttttttttttttttttttttttttttttttpAAJaKIABFttttttttttttKFttttttttttttttttttttttttttttttttttttttttIAJSSRAANtttttttttttttJNtttttttttttttttttttttttttttttttttttttpBJIFBBSRAAttttttttttttttBJFtttttttttttttttttttttttttttttttttttttpIAtIBRIIAAJttttttttttttSKNttttttttttttttttttttttttttttttttttttttptpBAABJABSJIFttttttttpQBRFtttttttttttttttttttttttttttttttttttttttttIIKQABTZIRJtttttttoQIJRttttttttttttttttttttttttttttttttttttttttpALSABIBKKUaBttttttqIBACFtttttttttttttttttttttttttttttttttttttttJIJRIJJKRTajQttttttKIIIAJNtttttttttttttttttttttttttttttttttttttpSAAABACRBcjTJFttttpDAABABRttttttttttttttttttttttttttttttttttttoIQIIAJJZJJSjiZIttttRRAIJAAKRttttttttttttttttttttttttttttttttttpJKJABALSTTRCTSJAAttqJQAABIAAKNtttttttttttttttttttttttttttttttttKaRJbaISdtqaIJRIIIJKSKQAIAQAIBZNttttttttttttttttttttttttttttttttKcQKKaJTttRJJAAAACAJJRAABABBAACFtttttttttttttttttttttttttttttttpSbKabiStttZRIAAAAIRIIYAABABIIAARtttttttttttttttttttttpKJRttttttpKRKTkcKVttTIAAJRBJBJCRAABAAIBAABtttttttttttttttttttttJIASNtttttoJIKckRSdtrZIAAJjSQAJRIAIJAAJIIIBNttttttttttttttttttttttABKFttttpAACTcbJTVSJAAABUaRAABAAABAACBBBAFttttttttttttttttttttttIAJRNtttIAAJTjZQJRJIAAAJchRIAIIAIAIAIIQIIItttttttttttttttttttttpIAACJJJKIAABKKATBAAAAAABLSCIAAAABAIBAJBBBBtttttttttttttttttttttpIIIASKaZIKIAIIKSkiJQAAAIJJIZIIAIIIIIIJJJJINttttttttttttttttttttCAABABSBBJSAAABUSTbKJAAAAAABSJBBAJAIBBBBBBABttttttttttttttttttttRAIIAAIRIaaIAIKZJAJJSIAAJIAIbQAIIRIIIIIIRRJAttttttttttttttttttttQAIBBAABBTSAAAJAABAJJAABJJABURBJBKIABBAAKJJAFttttttttttttttttttpIAIJIIIJJSZAJIJAQSQIJIIJJJQAUZIJJSRIJJIIJRRINttttttttttttttttttqAAAAABAABSJABAABBBJAAAABBJIAMaBBKSJBBKBBBJBBBttttttttttttttttttRAIIIIJIIJJIIJIAIIAAIAIAJJRQJLiJJSaRJJSQIISNoItttttttttttttttttpIBABBIBKBRBABJAAAAAAAAABJBBJBBbJBKSKBCKJIBJttAtttttttttttttttttpIIIJIJJRLRAAJRJAAJBRIIAKJRRRAJaQJSaRJKSSJIJttoNttttttttttttttttBABAABBCJURABJJKAABBJAAACJJKKABUIBKSSBBKKJBBttoFttttttttttttttttQAIIJJIJJcIJBRJJAAAAAAAIBSSRRRBTQJRaRIBSaRJJNttNtttttttttttttttpQBCABJJBCbBJCRJBBAAABABACKSttJBKJFJSSABKSKBBFttFtttttttttttttttoQJRIJSRJKaKIKSRRBIKISIJIARNtttIKYNpaRIJSaRJINttNtttttttttttttttpAJJABKKBLRBAKNKIAABBJAAAAJttttpCZFtKJBBKSKIIFttFtttttttttttttttoAJSIJSSQaQIBRttIIIIIIIAJINtttttLhQtqRJJSSaQINttptttttttttttttttpBBSJBKSJTBACNttAIAAAAAABAFttttpDaAtpJIBSSSJAFttptttttttttttttttpIJSRJRSKZIJRtttIJIAAAAAIANttttpaaItpRIJRRaRINttptttttttttttttttpBKSKBNpDRAKNtttABAAAAABAAFttttDbSAttBIBSNSJBFttttttttttttttttttpBSRpIttTIJSNttoAAQAAAIAAAFtttpabaIttJIJSVSRJFttttttttttttttttttoBLNtItpaAJStttoAABAAAAAAABtttqZLbIFtpIBJNpKBFttttttttttttttttttoJSNtotKhJQRtttIJRAAAAAAAIItttSIKjRNtpIJNttJINttttttttttttttttttpBRtttNDRFJJtttAKIAAAAAAAAAttpRFASCBtpABtttpJBttttttttttttttttttoJRttttKZNpNttpBaRIAAAAAIIANttJtpTJAtoIJtttpIIttttttttttttttttttoBFttttLSFpJttoCbRJAAAAABBAAttIttMCJtpAFttttJBttttttttttttttttttoKNttttTTRtJttoKrZJAAAAIIJAINtQttRJYtoItttttIIttttttttttttttttttoBttttpTTZtpttBKtJCAAAAABJAABtBttIRRFoBtttttBAttttttttttttttttttoJttttpaJRtottKVtRJBAAAAARIIINptoIhINoAtttttoAttttttttttttttttttoBttttLSAKttNtCVtJCBAAAABKAAABttoBBBtoFtttttoAttttttttttttttttttoJttttLQNSNtttLVqSRJAIAAARIIAJttJNIJtINtttttoIttttttttttttttttttpBttttLAtAFttpMVrKJAFoABAJIBABNtFoAFtAFttttttAtttttttttttttttttttAttttZAtoNttoTlqtQIFoAAAJIAAJIttpJttItttttttAtttttttttttttttttttBtttpQAFpFttpLaqtRAFpABAJIBABJFtptttBtttttttAtttttttttttttttttttJttttIIIptttoKittZANtAIJJIJAAJVtttttItttttttItttttttttttttttttttAttttJAtttttoBRVqRAttAABBABAABBtttttFtttttttAtttttttttttttttttttottttJQJtttttJNqZQAttIAJIIIAABJtttttNtttttttAtttttttttttttttttttpFtttoFttttttAFpJIFttoACJAJAAACFtttpttttttttFttttttttttttttttttttNttttNttttttIVpJINttpIJQAIIIAJNtttpttttttttNttttttttttttttttttttttttttttttttBNqAAFtttABJBAFAABJttttttttttttFttttttttttttttttttttttttttttttttJtqIANtttIJIAAVoAAJtttttttttttttttttttttttttttttttttttttttttttttCKKBAttttABAAAtpAABtttttttttttptttttttttttttttttttttttttttttttttJIABIttttIAIBItpIAItttttttttttttttttttttttttttttttttttttttttttttBAACBttttoAAJAttAAAtttttttttttttttttttttttttttttttttttttttttttttIBAAFttttoAARIttIAAtttttttttttttttttttttttttttttttttttttttttttttBAAAFttttoABJItpAABtttttttttttttttttttttttttttttttttttttttttttttJIAIFttttoAJRItpQAFtttttttttttttttttttttttttttttttttttttttttttttJIAAFttttBBBABtKIAFttttttttttttttttttttttttttttttttttttttttttttoZQAAJtttpJAAAFpSIANttttttttttttttttttttttttttttttttttttttttttttpZIABAtttoJAAACKJABttttttttttttttttttttttttttttttttttttttttttttRRZQAJItttoJAAAKRIANttttttttttttttttttttttttttttttttttttttttttKKTIRJABIBttoAAABCJAAtttttttttttttttttttttttttttttttttttttttttpKRJJQRRIBQJZRZAAAIJIANttttttttttttttttttttttttttttttttttttttttpKJAABJJKABAKKKJAAABJABtttttttttttttttttttttttttttttttttttttttttJIINttpIKIIAIJJJIIAJIItttttttttttttttttttttttttttttttttttttttttBAFtttttBCIAAABABAAABFtttttttttttttttttttttttttttttttttttttttttpItttttttIBQAAtpIKAAAtttttttttttttttttttttttttttttttttttttttttttAFtttttttoBIAFttttAAFttttttttttttttttttttttttttttttttttttttttttoNttttttttoBQINtttoIANttttttttttttttttttttttttttttttttttttttttttptttttttttpAIAFtttpAAFttttttttttttttttttttttttttttttttttttttttttNttttttttttAQANtttIAAttttttttttttttttttttttttttttttttttttttttttttttttttttttAAAFtttAAAttttttttttttttttttttttttttttttttttttttttttttttttttttttIIANtttAAANtttttttttttttttttttttttttttttttttttttttttttttttttttttAAAFtttAAAFtttttttttttttttttttttttttttttttttttttttttttttttttttttoIANtttoAIFtttttttttttttttttttttttttttttttttttttttttttttttttttttoAAFtttoBAFtttttttttttttttttttttttttttttttttttttttttttttttttttttoIIFttttJIAtttttttttttttttttttttttttttttttttttttttttttttttttttttoBABttttBBAtttttttttttttttttttttttttttttttttttttttttttttttttttttIJIQtttoJBANttttttttttttttttttttttttttttttttttttttttttttttttttttBBIAtttpBBBAFtttttttttttttttttttttttttttttttttttttttttttttttttttIJJAtttoJQRIFtttttttttttttttttttttttttttttttttttttttttttttttttttAKJBttttAJBBBtttttttttttttttttttttttttttttttttttttttttttttttttttJSRAttttoIoNttttttttttttttttttttttttttttttttttttttttttttttttttttCSRAtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttpSSRANttttttttttttttttttttttttttttttttttttttttttttttttttttttttttpKSKAFttttttttttttttttttttttttttttttttttttttttttttttttttttttttttJRZSAttttttttttttttttttttttttttttttttttttttttttttttttttttttttttpJRRKAttttttttttttttttttttttttttttttttttttttttttttttttttttttttttJJJRSItttttttttttttttttttttttttttttttttttttttttttttttttttttttttpIRLJLItttttttttttttttttttttttttttttttttttttttttttttttttttttttttJJRSISQtttttttttttttttttttttttttttttttttttttttttttttttttttttttttACARAKAtttttttttttttttttttttttttttttttttttttttttttttttttttttttttNQJQIZAttttttttttttttttttttttttttttttttttttttttttttttttttttttttttAqBpQFttttttttttttttttttttttttttttttttttttttttttttttttttttttttttNottNttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt", "dr": "tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttRRtttttottttttttttttttttttttttttttttttttttttttttttttttttttttttJLSSJtttpJttttttttttttttttttttttttttttttttttttttttttttttttttttpLiiJIJRNpRNtttttttttttttttttttttttttttttttttttttttttttttttttttKLUbaAAABJJAtttttttttttttttttttttttttttttttttttttttttttttttttttpZTabQIAIIAANttttttttpNtttttttttttttttttttttttttttttttttttttttttpALaRIJFttAtttttttttttKNttttttttttttttttttttttttttttttttttttttttIAASZSQJJNttttttttttttpZttttttttttttttttttttttttttttttttttttqttpAABCLJAABttttttttttttttBFttttttttttttttttttttttttttttttttttttJRJINJKaRIAttttttttttttttpIIttttttttttttttttttttttttttttttttttttpJABpACJIBAABttttttttttttpSKNtttttttttttttttttttttttttttttttttttttttJJIABQIJSQNINttttttttpYBZNttttttttttttttttttttttttttttttttttttttttBBKIABLZACJNtttttttpIABJtttttttttttttttttttttttttttttttttttttttpASRIBQASRTjRNttttttKIIAJJtttttttttttttttttttttttttttttttttttttpJACJABBLJUbUSBttttttCBAAACNttttttttttttttttttttttttttttttttttttKQIAIBASRBTkjZItttttpRIIJAASNtttttttttttttttttttttttttttttttttpBBAAAABKZKJCTbKBBsttqJQAABAABJFttttttttttttttttttttttttttttttttKRSSRJAaRaqaISSQITakRSKIAIAQAABRtttttttttttttttttttttttttttttttpTbICLaBLttqSRBBBLRKTbRSAABABBAACJttttttttttttttttttttttttttttttJbiKabZSdttaJIAABgBIIKjYAAJABIAIARttttttttttttttttttttSJJtttttttCLRKUcaLtttSRAABBSBJAACaAABAAIBAACFttttttttttttttttttJIISNttttttJJJKkjRSttqZIAAITbRRIAAKYIBAAJIIIAIttttttttttttttttttNtABKNttttsbABKUkaKTdSJAAABLjbLJABBMIBAABABBABttttttttttttttttttttIAJRNttshLQAKbjYQJSJQAAABTjTZKZRIBiAIIIQJIIBNttttttttttttttttttpIAABJJKjIBZABKJBbBAAAAAAAJaLaALSABLRABABBBJAFttttttttttttttttttpIIIAKRcZQIhAAIAKRkaRQAAAAJJRbIKcRJJbQIIJJJIIIttttttttttttttttttKAABABLZCSTZAAAKcKLbJJIJABAAKLRBUbJIKaBBAAJJBBFtttttttttttttttttQAIJAIbISabRAAISQIAJJSIIAJJIJSjILjaJJTZIIIJRJINttttttttttttttttpIAIBAMQCTSbIAABJAAKAJAAAABBABKNaBUbQBKTBBBCKJBBttttttttttttttttpIAIIKhJRSaaIAIIIJISRIJIABIJJJRVrZBbZIJUZIIJRJJINtttttttttttttttJAABBcTRBJMKIBJAABABBAAAABBJJAKKqcJLbAEciJIAJJpAFttttttttttttttpQAIIcbjRIIaSJJJAIIIAAAAAAJJRRISStSiJaQKjSRRISVtoBttttttttttttttqABADaUaBACaKAJBIAAABAAAABJJJKABKtKSBCSBMSKJBCFtpAttttttttttttttJAJJiSbIIILpSJJJQABJJRIIABRJSSQBRtqTIBUZIiaRJJNttItttttttttttttpIBBbLbRBJATqKJJJJAABABAAABKKJKKBKtqLbIMaAMSSJJFttotttttttttttttpIJTaaZIRILdqRKRJQIAAAIIAIBRSVJRSRttSbiLiQKiSIQIttotttttttttttttqADaTRAAABbNKKSKKIBBCAKABIAJJtttpKttKJTDSRAUaJIBttpFttttttttttttpJiTZIAAALZtSSRqRIBIJIRIAAAJNtttpSttRVcTjaJJbRIItttNttttttttttttpDcaAABJKaKtKKKtpBAABBJAABIBttttqtttqNjSUbSRDZBBtttFttttttttttttqibQIJSaUZVpSRttpBIAIIIAABIAttttttttqSiaKbYRJjJItttNttttttttttttbLTIKJKKaKNqKNttpABAAAAAAAABtttttttttKaZABaBRDJAtttNtttttttttttsZbTKhIRkRStqRtttoIBIAAAABIAAtttttttttSiYTiLQKQhItttttttttttttttaLSULjJMlKKttKtttAAAIAAAABAAAtttqNttttqiQaMSBRAaAttttttttttttttrKaRUTjJlpRVttttttIJIIAAAAAAAItttqVttttqhJZJiJhIiItttttttttttttsZTJAKEjKdCKNtttttpBKIAAAAAAAAAFttSKttttqrJLBaBIISAtttttttttttttrTQASJUrLtJRttttttoJaIIAAAAAIAAFttRRttttqtZMRhBhJhItttttttttttttiJAEcKMsUtKKttKNttADTIJAAAAAABAAttKNttttKtjCdiLRDZBFtttttttttttthQAUaIdsltRSttRVttJVrQQAAAAIIJIIFtRVtttpRtTjliMiMZJNttttttttttttZJBDZBlttqKNtqKNtpBNqIJAAAAAABAAAtKttttqKtMclZcacpBFtttttttttttthKCRZLtttpRVtpSNtpSdtIRIAAAAIJQBAFSVtttpStqibktltpIFtttttttttttthMJkactttKKttqKNtpKttCJBAAAABKBBABKKtttKKtoMRMttttAFttttttttttttjUibcttttSRtttRttpadqSJIAIAAASIBAIJSttRSVtINjlttttINttttttttttttscthFttttKNtttKttJbNqrBAFoAAABJBABKKKKKKttAFttttttpFtttttttttttttttoNtttqRtttttttJcdSrQINoAAAJRAIARRRRRVttItttttttoNttttttttttttttttFttttttttttttBUVVrIAFpABABJBIABJttttttAtttttttoFttttttttttttttttFttttttttttttJTVtqQAttIIBJIJIABRNtttttNtttttttoNttttttttttttttttAttttttttttttoCNVqIBttAABBBBAAABNtttttFtttttttoFttttttttttttttttottttttttttttoIVSRINttoIJQIIIAAIRttttottttttttotttttttttttttttttpttttttttttttpBVIJAFttpACJABAAAAJttttpttttttttottttttttttttttttttNtttttttttttoBtpIANtttIJRAIFIAAJNtttNttttttttottttttttttttttttttttttttttttttpJtpAANtttABJAAFpAABFttttttttttttFttttttttttttttttttttttttttttttoSSZAIttttIIIAANtIABNttttttttttttNttttttttttttttttttttttttttttttpIBACBttttoAABAFtBAAFtttttttttttttttttttttttttttttttttttttttttttpIAAJFttttoAAJINtRIANtttttttttttttttttttttttttttttttttttttttttttpAIAAFttttpAACIFtJAAFtttttttttttttttttttttttttttttttttttttttttttoIAAINtttttAASJNtJAANtttttttttttttttttttttttttttttttttttttttttttpBAAAFttttoAAJJFtJAAFtttttttttttttttttttttttttttttttttttttttttttqSAAAFttttJAIIAtpRIAttttttttttttttttttttttttttttttttttttttttttttDKAABFttttBAAAApKIABttttttttttttttttttttttttttttttttttttttttttttLRIABItttoJIAAASRIANtttttttttttttttttttttttttttttttttttttttttJKSDJIBCAtttoBAAABJJABttttttttttttttttttttttttttttttttttttttttpSSSSKJRAJIRRRQIAAAJIIANtttttttttttttttttttttttttttttttttttttttJKJBABBJRABAKSKSAAABBAAFtttttttttttttttttttttttttttttttttttttttJIIIAJJIIRIAIJRJRAAAIIINtttttttttttttttttttttttttttttttttttttttpABtttttpBKAAABBBBAAABBFtttttttttttttttttttttttttttttttttttttttpINttttttoIKIIBtJJJIAAttttttttttttttttttttttttttttttttttttttttttAFttttttttACAAFttttAABtttttttttttttttttttttttttttttttttttttttttpNtttttttttIJIINttttIAFtttttttttttttttttttttttttttttttttttttttttpttttttttttoBAAttttpAAFtttttttttttttttttttttttttttttttttttttttttNttttttttttoJIAttttIIANttttttttttttttttttttttttttttttttttttttttttttttttttttpAAAttttBAAFtttttttttttttttttttttttttttttttttttttttttttttttttttttAIAttttIAANtttttttttttttttttttttttttttttttttttttttttttttttttttttAAAttttoBAFtttttttttttttttttttttttttttttttttttttttttttttttttttttIIINtttoJIBtttttttttttttttttttttttttttttttttttttttttttttttttttttABAFttttBAAtttttttttttttttttttttttttttttttttttttttttttttttttttttAJANttttBIANttttttttttttttttttttttttttttttttttttttttttttttttttttABBBttttBBBFtttttttttttttttttttttttttttttttttttttttttttttttttttoIJIItttoJIIINttttttttttttttttttttttttttttttttttttttttttttttttttoAJIBtttpBIJBAtttttttttttttttttttttttttttttttttttttttttttttttttttBRQBttttIJAIAttttttttttttttttttttttttttttttttttttttttttttttttttpCJRAttttpBFBtttttttttttttttttttttttttttttttttttttttttttttttttttoSZQItttttttttttttttttttttttttttttttttttttttttttttttttttttttttttKKRQANttttttttttttttttttttttttttttttttttttttttttttttttttttttttttJRZYAVtttttttttttttttttttttttttttttttttttttttttttttttttttttttttpKKRZAttttttttttttttttttttttttttttttttttttttttttttttttttttttttttJKKRZNtttttttttttttttttttttttttttttttttttttttttttttttttttttttttBBJKJRJttttttttttttttttttttttttttttttttttttttttttttttttttttttttpJKRZJaIttttttttttttttttttttttttttttttttttttttttttttttttttttttttpARCJBRAttttttttttttttttttttttttttttttttttttttttttttttttttttttttoJIKIBYFtttttttttttttttttttttttttttttttttttttttttttttttttttttttttpFJBqIFtttttttttttttttttttttttttttttttttttttttttttttttttttttttttptItpNttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttptttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt", "dp": "tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttNtttttttttttttttttttttttttttttttttttttttttttttttttttttttKKKttttpFtttttttttttttttttttttttttttttttttttttttttttttttttttttpRaRSJtttJNtttttttttttttttttttttttttttttttttttttttttttttttttttpJUURBBKJJCJtttttttttttttttttttttttttttttttttttttttttttttttttttpSajbQIAAKSQNtttttttttttttttttttttttttttttttttttttttttttttttttttKSabTJABAAAAtttttttttpttttttttttttttttttttttttttttttttttttttttttJIbahIIVtIANtttttttttpRtttttttttttttttttttttttttttttttttttttttttBABSJKJJJtttttttttttttKNttttttttttttttttttttttttttttttttttttttttIABKSRIIJtttttttttttttpQttttttttttttttttttttttttttttttttttttpttpABKLSIABttttttttttttttoAFttttttttttttttttttttttttttttttttttttJRJApIKSQIAttttttttttttttpRItttttttttttttttttttttttttttttttttttttBABpACJAJAABttttttttttttpRKFtttttttttttttttttttttttttttttttttttttttIJAABRAJaQNINttttttttpQKRtttttttttttttttttttttttttttttttttttttttttBACIABTZACJNtttttttpIABJtttttttttttttttttttttttttttttttttttttttoISZIJIJJSTjQtttttttKIAAJNttttttttttttttttttttttttttttttttttttttKACKAAKBSKbcSFttttttDABAAKFttttttttttttttttttttttttttttttttttttpRAIIIIJSIUkbaQtttttpSAIIABZtttttttttttttttttttttttttttttttttttpBRBAABATJAKUbSBFttttJRAABAACJtttttttttttttttttttttttttttttttttpJRIIBABSaTZJSbRJINttpRQAIAQAAKNttttttttttttttttttttttttttttttttCSKSSSAKSStTQCJJBbAJKKCIABAJBAAKFtttttttttttttttttttttttttttttttKkYJRbQSdttSSQIJCIaJRRSIAJAKIIIJQttttttttttttttttttttttttttttttpLURSTSKKttrJJAAADBCZBIRAABABIAAAKFtttttttttttttttttttpaJVttttttpbaKSkkSdttqSIAAIaKJaIAgAAAIAIAIABNtttttttttttttttttttBBCRttttttrkjJTcbKVttTRAAAKaRBaJKRAAAIACBBAAJttttttttttttttttttpNoIKRttttskYUjbkjZadtZJIAALZYAaRJIAIIIIAQJJIJNttttttttttttttttttttABLNtttkZACcbckRCTSJIAAALRIBTKBBABAAAABBBBBFtttttttttttttttttttoIAASNttiAACbkjZJQJIJAAAALIZASSIIAAIIAIBJJJIJtttttttttttttttttttpIAABRJKcAACbTcQCaJAAABAAKARALKJABBBBAAAIJBJBFttttttttttttttttttJIIIAKRSkRIRaSSjaTjiKQAIAZBZIUqSIIJJBBIIIJIJINttttttttttttttttttKAABAAKIEaJSLbSLcRLbKBBAARCSBMqKIABBBABBBBBBJBttttttttttttttttttRAIBAIIJKkRKaiiIKhAJJRIAAgUhITtRRIJJIIJIIIRJRANttttttttttttttttpQAABABABKUaASTTJAUZAJAABBhMSAStKJBCJAIBJAIKKJIFttttttttttttttttpIAIIIJIIJSkQKSRRIAcZAJIABgcZIiVqRJKRQIJJIIJRRRIttttttttttttttttqAAAAABBAKKUZAKSJAABcIABACQURBaNqKJKKJABKBBBJJBAttttttttttttttttRAIIIJJIJSRSjIBSJIAALhAIALQTRJhStRRSSRJJSRIIRNtINtttttttttttttttJAAABBBBJKKKUZAJBAAIBcIABaBbJCaKtKKKSJBCSJJAKNtoFttttttttttttttpQAIIJJJJJRVRRjICQIIIILiAJgKiIKZRtqSSaRJJSRJJKNtpJttttttttttttttpABAABABKCKNKJUYBRBABABcIBZCRALJKNqKKSSBBKSJBBNttAttttttttttttttJAJIIJJIJJStSJSiIaIIJQALiAhKQBTRSVpRRaSJBRSRJJNttottttttttttttttJABJAKJBJKKqKKJUQMSABKABcTYLIKMKKVtKJSSBBKSSIJJttpFtttttttttttttRJJIISRJJRRqRSSThLjZASIJjiJkQbcqRttSRaRJBSSaQIIttpNtttttttttttttJBJJBJSIBKNqKKJScKcaICJcSTbbJclqKttpKKKBBKSSJBBtttFtttttttttttttIIRRIJSRJRVpSSVpLicjQBTSaajSIllqRttpSpRJJJSaRJAtttNtttttttttttttABKJBCSSBKtqKJttBkbkaAEBABbRCtttttttKqJJBKSLKJBFttFtttttttttttttIJSaRJSaJStSRtttIUicaRSRbJaRMtttttttStRRBSSSSIINttttttttttttttttIBKKJBNKKKtKKtttICkSTRZDKRbIMtttttttqtJJBKKKSJAFttttttttttttttttIJTRRJtpSRtpVtttIIcaTchaBhaQdtttttttqVpJAJRpaRINttttttttttttttttACTNqBtqKNtqNtttAADiKbjZCSRRcttKtttttNpBBKRqKKAFttttttttttttttttISattotpRVttVttpAJIkSijRbSRIcktRVttttVtJAKJtpRJNttttttttttttttttAJSttptCKttttttoBKAEZZbUJACIaMkSNttttttBBAtttJBFttttttttttttttttJRRtttVJSttttttoJRJBjhkZIKSKZJTjVttttttIIJtttJIJttttttttttttttttBKNttttKKttqNttALSJBMbcSLSCLRBBLltttqNtBBFtttpBBttttttttttttttttIJNttttRSttSVttJTbQQCibkhQILJJJJctttpStJAtttttIIttttttttttttttttBCNttttKNttKNttBNrIIAcLbRABbTcccktttqKtBBtttttJAttttttttttttttttIJtttttRVttRVttJVqQRILhTRSckkkkjktttpRtIBtttttpIVtttttttttttttttpBttttqKNttKNtpKVtJJBBjKbSJUkkJKNtttqKtBFtttttpAFtttttttttttttttoJttttpRVttSRtoTVtJJJAUZbZIJbbkkjtttRStINtttttoANtttttttttttttttpBttttqKtttKNtpLNqKJBACiMbJABALccdtqKKtAFttttttAFttttttttttttttttIttttSRtttpVtoUVqSRIAocTiaRSaIIJkiRSVtINttttttINttttttttttttttttAttttKNttttNtpUdqtRABpDbccbckRSQCcaNttBFttttttoFttttttttttttttttIttttttttttttoTiqtZIFtIcjaaabRSZAKkdttItttttttoNttttttttttttttttottttttttttttpKattRAFtADbTaSJJBJAIMlttAtttttttoFttttttttttttttttoNtttttttttttoKattZANtoIjSaaZIUjQIDlttItttttttoNttttttttttttttttpFttttttttttttBJrtJANtpAEZLbZAUckcSkttFtttttttpFtttttttttttttttttNttttttttttttIKpRRAtttIBjRbaIMhUiklttNttttttttNtttttttttttttttttpttttttttttttACtBBBtttAAMaLSQCkcZcltpttttttttpFtttttttttttttttttpttttttttttttINtQIAtttoAKjRaZAcjIcklpttttttttoNttttttttttttttttttNtttttttttttpNtIABtttpABMaURABAAcaktttttttttptttttttttttttttttttttttttttttttpVtYABttttAJJjSiIAALjRltttttttttptttttttttttttttttttttttttttttttpJJIBBttttAAAURLIAABADltttttttttqtttttttttttttttttttttttttttttttoIAAJNttttIAALhKZAAAActtttttttttttttttttttttttttttttttttttttttttpAAAIFttttoAAKcZUABAMkktttttttttttttttttttttttttttttttttttttttttpAQAINttttoAARJjLZJJckklttttttttttttttttttttttttttttttttttttttttoAAAAFttttoABKIcRJKJBJDlttttttttttttttttttttttttttttttttttttttttpJAAANttttoAARQsiJJQIJctttttttttttttttttttttttttttttttttttttttttpKAAAFttttBAAAAtUkjJLcktttttttttttttttttttttttttttttttttttttttttqZIAAJttttJIIAApSakkkkttttttttttttttttttttttttttttttttttttttttttqaAABAtttpBAAAAKJIAUttttttttttttttttttttttttttttttttttttttttttttJZQABItttoIIAAIZJIAtttttttttttttttttttttttttttttttttttttttttpJKSKJJACIFttpBAAABJJABttttttttttttttttttttttttttttttttttttttttpSRRSRQZIBQKRSSIAAAJIIANtttttttttttttttttttttttttttttttttttttttpKJAABIJKABICSKSAAABBIAFtttttttttttttttttttttttttttttttttttttttpRIAINpIIKIAIJJRRIAAAIIIttttttttttttttttttttttttttttttttttttttttJAFtttttBCIAABBBBIAAABFttttttttttttttttttttttttttttttttttttttttpINttttttIJQIARJIAQIAFttttttttttttttttttttttttttttttttttttttttttAFtttttttoBJAAttttoAANtttttttttttttttttttttttttttttttttttttttttoBttttttttoAQAAttttoAAttttttttttttttttttttttttttttttttttttttttttIttttttttttAJBBttttBAAttttttttttttttttttttttttttttttttttttttttttNttttttttttIJAAtttpJAAtttttttttttttttttttttttttttttttttttttttttttttttttttttABABtttoAAAtttttttttttttttttttttttttttttttttttttttttttttttttttttoBAAtttoIAAtttttttttttttttttttttttttttttttttttttttttttttttttttttpAAAtttpAAAtttttttttttttttttttttttttttttttttttttttttttttttttttttpAIIttttIIANtttttttttttttttttttttttttttttttttttttttttttttttttttttAAAttttoBAFtttttttttttttttttttttttttttttttttttttttttttttttttttttIAINtttoJAAtttttttttttttttttttttttttttttttttttttttttttttttttttttABAFttttBAAtttttttttttttttttttttttttttttttttttttttttttttttttttttIJBNttttBJINttttttttttttttttttttttttttttttttttttttttttttttttttttBBBAtttpBBAFttttttttttttttttttttttttttttttttttttttttttttttttttttIJIItttpJIIINtttttttttttttttttttttttttttttttttttttttttttttttttttAJIAttttBJBBAtttttttttttttttttttttttttttttttttttttttttttttttttttIRRJttttIJAIINttttttttttttttttttttttttttttttttttttttttttttttttttBKJAttttpABBttttttttttttttttttttttttttttttttttttttttttttttttttttKSRINtttttNttttttttttttttttttttttttttttttttttttttttttttttttttttpKSKAFttttttttttttttttttttttttttttttttttttttttttttttttttttttttttpSSKIFttttttttttttttttttttttttttttttttttttttttttttttttttttttttttpKKLAFttttttttttttttttttttttttttttttttttttttttttttttttttttttttttJZSLINtttttttttttttttttttttttttttttttttttttttttttttttttttttttttpJQSDJFttttttttttttttttttttttttttttttttttttttttttttttttttttttttpJKJZKRNttttttttttttttttttttttttttttttttttttttttttttttttttttttttpIKLRDZFttttttttttttttttttttttttttttttttttttttttttttttttttttttttJIRKIJRBttttttttttttttttttttttttttttttttttttttttttttttttttttttttACAKACIFttttttttttttttttttttttttttttttttttttttttttttttttttttttttNpJQAKINtttttttttttttttttttttttttttttttttttttttttttttttttttttttttotINqBttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttNtotttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt", "dc": "tttttttttttttttttttttttttttttttttttttttttttttttscktttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttZISdtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttiABBDttttttttttttttttttttttttsklttttttttttttttttttttttttttttttttgQIRjlttttttttttttttttttttttsaKclttttttttttttttttttttttttttttttsJRRcctttttttttttttttttttttttsSJRctttttttttttttttttttttttttttttthCKRJKllttttttttttttttttttttttkRJMttttttttttttttttttttttttttttttZCBBBKcVttttttttttttttttttttttZIIalttttttttttttttttttttttttttttsRZTSbkjMtttttttttttttttttttttsLQAJUttttttttttttttttttttttttttttrCBZUttrUtttttttttttttttttttttsjIILUtttttttttttttttttttttttttttthJbZltjilttttttttttttttttttttttjMZDTtttttttttttttttttttttttttttsIJbKtsbjltttttttttttttttttttttsbkiKZlttttttttttttttttttttttttslhBSjKkZLktttttttttttttttttttttttRDjCSUtttttttttttttttttttFttttscZCTaASBMtttttttttttttttttttttttthARJbTttttttttttttSRtttttNttttiURSaaRJJlttttttttttttttttttttttttsJSKTTltttttttttqKSSJtttJFttttaKBcbbbTLttttttttttttttttttttttttttiRcjblttttttttJijJIJRNJQttttsRIKiISSbdttttttttttttttttttttttttttsjBBTcttttttpKTbaAAACKJFttttrJAKJEkkltttttttttttttttttttttttttttssjQLbttttttKSbaZIAIIAAttttthIJaIcttttttttttttttttttttttttttttttjckhCSltttttKCbLJAFtBAFttttsRBLaAdttttttttttttttttttttttttttttttiJRSJZlttttpIBKRJRJVtttttttsQRbZJlttttttttttttttttttttttttttttttsRBBATUttttpAAJSSAABFttttttiBCaBLQtttttttttttttttttttttttttttttttrRJISTtpttRAJRaRAANttttttthITiLhIttttttttttttttttttttttttttttttttZKACTltBJIBoBKSAAFttttttsQBUZMpJBtttttttttttttttttttttttttttttttiSIKaltpIINQARIJAAJtttttsIKcYcpRZNttttttttttttttttttttttttttttttsKACSdttpNoBIABJABSIoFttrALbAdCACJttttttttttttttttttttttttttttttsSIJacttttttIIKQAJbZIRJthASZKlKIARNttttttttttttttttttttttttttttttaAAMUttttttALSABIBKSUSFhALIEtKAABJttttttttttttttttttttttttttttttjIRLjlttttpQJRIJJKZTbiRgARIcpRAIAKJtttttttttttttttttttttttttttttsIJCbVttttKAAABABRCcbbLQBQBdpQABAAKFtttttttttttttttttttttttttttttYJAbMtttIRAAAJBZIJTjaTQARTtRQAAQABRtttttttttttttttttttttttttttttiBBDDttBKIBBACTSTJKTRMIBRcKCABAJAACNttttttttttttttttttttttttttttsIIJJlpaRSaRIaRVqaIRRSQSThaSIAIBIAASNttttttttttttttttttttttttttttQABAdCUZBJbJTttSJJBBLIJTJJRAAABAAABJttttttttttttttttttttttttttttiAKQUKbYabaJdttZRIAAJYBgJKIAAIAIAIAQtttttttttttttttttttttttqSCNtsQKSDSSCTcjKdttSJAAJAaDSADAAAIABBAACFttttttttttttttttttttttJIKRttiLaJhRJTkaSdtqZIAAKaTiRRSIAIQIBAJIJNtttttttttttttttttttttptoAKNtsSSRTACTcbKTtqBAABCcKSKJIAAAAAAIBBAJtttttttttttttttttttttttoAJZNtraITIATkiISaRQAAAJkZRRQJIAIIIIQJIIJtttttttttttttttttttttttpAACJNtbADIBKTJKAJBAAAACUSNKJBABABABBCBJBFttttttttttttttttttttttJIAASJRbJbQIJRIbSQIIAIAJKSRqRIAJIBAIBJIRINttttttttttttttttttttttJABABRKScaIAAADScbKIAAAABCKtKIBBBBBAAAJBABtttttttttttttttttttttpYAAIAKQJSRIAAJbRJbRJIIAIABStRQIBJBBIIIJJJAtttttttttttttttttttttqABAAABBKKKIABCRBABBRAABBABKNKJBBJBBBABCJJAFttttttttttttttttttttqABAQJIAKRSIAARIIJIJIIIBJJIRVpRIJRJIJJJCSRINttttttttttttttttttttJABAABABKKKABABBIKJABAABBJAKNqKJKJABBJABJJJBttttttttttttttttttttQAAIIJIISRRIJIIBIJJIAIAJJRIRRqRRSRQIJRIIJQIItttttttttttttttttttqIBBABBJBKKKAJAABAAAAAABBJKICKtKJSJIJKJJAKNtANttttttttttttttttttpIIIIJJJJRRRJRIAAIAIAIAJJJJQJStSRaSQISZRIKNtoNttttttttttttttttttJAAABBBJCKqJBJBAABBJAAACJJKIBKNKKKSIIKSJBCFtpFttttttttttttttttttIAJIJIJRJRqRRJJIAJIJAAAJRRRRJRVpRSaQIRSRJJNttFtttttttttttttttttpABBAJJBJKNqJKJKAAAAAAAACKSJKJKtqKKSJAKSSJKFttFtttttttttttttttttqIJQIJRIRRVSRZRJIIAAJIBIKSRttJRttRSaRIJSaQQNttItttttttttttttttttqBBJAKKBBKtKKSRJAABIKABABJFttqKttKKSIACSSJIBttotttttttttttttttttpBJRASSRJStSSVSQAIJIRIAAARtttqRttRRSRJJSZRIIttotttttttttttttttttpBJJBKSJCKqKKNtAAABBJAABAFtttqNttKNKJBKSSJBBttptttttttttttttttttoISRIKaRSVpSRttIIAIIIAAIANtttttttpVSRJSRSRJIttptttttttttttttttttBBKSIKKRKNqKNttABAAAAAAAAFtttttttqNKJBKJLSBAttptttttttttttttttttIJSSQJtRRtpStttIAIIAAABIANttttttttVpJIKRSZIAttttttttttttttttttttACSSJFtKKtqKtttAAIAAAABAAFttttttttNpJBKKKSJAttttttttttttttttttttIKaVpNtRSttVttoAIJAAAIIAAFtttVttttVpJAKRpRQIttttttttttttttttttttAKSttFpKNtttttoBJBAAAAAAABttqKttttttBBJNtBJBttttttttttttttttttttIKVtttpSVtttttIJRIAAAAAAAIttpSttttttJINttpIIttttttttttttttttttttBKNtttpKNtttttBKJAAAAAAAAAttqKttttNtBBNtttJAttttttttttttttttttttIRttttpRttSVttJaZJIAAAAIIANtqStttpVtJIttttJIttttttttttttttttttttBJttttqKttKttpBTSCAAAAABABAtqNtttqNtBBttttpBttttttttttttttttttttIRttttRRttRttoJtRKAAAAAJIAANpVtttpVtINttttpINtttttttttttttttttttBNttttKNtqKNtpKtRCBAAAABJAAFSNtttqJtAFttttpAFtttttttttttttttttttINtttqSVtpSNtJatZJJAAAABRIIISStttRVtItttttpANtttttttttttttttttttAFtttqKttqKttCVtJKBAAAABJAAABKttqKNtAttttttAFtttttttttttttttttttINtttqRtttRttKatRRIAIAABRIIIJSVqRSVoIttttttINtttttttttttttttttttoFtttKKtttKttDitVRBFoABAJAABCKKKKKtpBttttttBFtttttttttttttttttttoNtttRVttttttKjqtYIFoAIAJIJAJRSRRVtoNttttttoNtttttttttttttttttttoFtttttttttttCbqtRAFpAAAJABABKNttttpFttttttottttttttttttttttttttoNtttttttttttJittZANtAIJJIIAAKNttttoNttttttotttttttttttttttttttttFtttttttttttBSrqJAttAABBABAABNttttotttttttotttttttttttttttttttttNtttttttttttIJqaRJttIIJJIJAAJRttttotttttttotttttttttttttttttttttotttttttttttACpJIFttoACABAAAAJttttFtttttttptttttttttttttttttttttptttttttttttIKqJIFttpAKQAIIAAJNtttNtttttttottttttttttttttttttttttFttttttttttoNtAAFtttABJBApBABFtttttttttttFtttttttttttttttttttttttttttttttttpVtIANtttIJIAAtIABNtttttttttttNtttttttttttttttttttttttttttttttttCKTAAFtttABAAAtJABFtttttttttttNtttttttttttttttttttttttttttttttttJIIAIttttIAAIAtoIANtttttttttttttttttttttttttttttttttttttttttttttpAACBttttoAAJFtpABFtttttttttttttttttttttttttttttttttttttttttttttoJIBBttttoAARNtpIAFtttttttttttttttttttttttttttttttttttttttttttttoAAAFttttoABJFtpAAFtttttttttttttttttttttttttttttttttttttttttttttIIAIFttttoABRNtKIANtttttttttttttttttttttttttttttttttttttttttttttKIAAFttttBABJFtJAANtttttttttttttttttttttttttttttttttttttttttttttKQAIAttttJAIANpRIAttttttttttttttttttttttttttttttttttttttttttttttTJAAItttpJAAABKJABttttttttttttttttttttttttttttttttttttttttttttttSRAIItttoIAAAKRIANtttttttttttttttttttttttttttttttttttttttttttJKJKJABINttoBAAAKJAAttttttttttttttttttttttttttttttttttttttttttpSSSZRSIBIJRRQIAAARIANtttttttttttttttttttttttttttttttttttttttttpKJABBCKJBICSKRAAABJABttttttttttttttttttttttttttttttttttttttttttRIAAJJJJIAIJSSRAIAJIIttttttttttttttttttttttttttttttttttttttttttJABttttBBIAABBBBAAABBttttttttttttttttttttttttttttttttttttttttttpINtttttIJQIAIIIJIAANtttttttttttttttttttttttttttttttttttttttttttAFttttttoBIABtttqAAFtttttttttttttttttttttttttttttttttttttttttttoNtttttttoAQABttttIANtttttttttttttttttttttttttttttttttttttttttttBttttttttpAIAFtttpAANtttttttttttttttttttttttttttttttttttttttttttNtttttttttIIINtttJIAtttttttttttttttttttttttttttttttttttttttttttpttttttttttABAFtttBAAttttttttttttttttttttttttttttttttttttttttttttttttttttttIIANtttIAAttttttttttttttttttttttttttttttttttttttttttttttttttttttoBAFtttAAAttttttttttttttttttttttttttttttttttttttttttttttttttttttoAANtttIIANtttttttttttttttttttttttttttttttttttttttttttttttttttttoBAFtttoAAFtttttttttttttttttttttttttttttttttttttttttttttttttttttoAIFtttoIAFtttttttttttttttttttttttttttttttttttttttttttttttttttttoBBFttttBABtttttttttttttttttttttttttttttttttttttttttttttttttttttoAIIttttJIItttttttttttttttttttttttttttttttttttttttttttttttttttttoBAItttoBBANttttttttttttttttttttttttttttttttttttttttttttttttttttoJIItttoJBAIttttttttttttttttttttttttttttttttttttttttttttttttttttABJAtttpBBJIFtttttttttttttttttttttttttttttttttttttttttttttttttttoJRAttttJQJINtttttttttttttttttttttttttttttttttttttttttttttttttttoKKAttttABBJttttttttttttttttttttttttttttttttttttttttttttttttttttJSRItttttottttttttttttttttttttttttttttttttttttttttttttttttttttttKSKANtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttSSKINttttttttttttttttttttttttttttttttttttttttttttttttttttttttttpKLLAFttttttttttttttttttttttttttttttttttttttttttttttttttttttttttJRSLIttttttttttttttttttttttttttttttttttttttttttttttttttttttttttpJRSLAttttttttttttttttttttttttttttttttttttttttttttttttttttttttttJJJZKQtttttttttttttttttttttttttttttttttttttttttttttttttttttttttpAKLJLINttttttttttttttttttttttttttttttttttttttttttttttttttttttttpIRKIRQNttttttttttttttttttttttttttttttttttttttttttttttttttttttttACARAKAtttttttttttttttttttttttttttttttttttttttttttttttttttttttttNRIQIRAttttttttttttttttttttttttttttttttttttttttttttttttttttttttttApBtIFttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttNtNttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt", "dh": "tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttFttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttotttttttttttttttttttttttttttttttttttttttttttttttttttttttttSJNttpJtttttttttttttttttttttttttttttttttttttttttttttttttttttttpKaSRJpRNtttttttJttttttttttttttttttttttttttttttttttttttttttttttpSaIABKJAttttttttpRttttttttttttttttttttttttttttttttttttttttttttJUjZAAAIANtttttttttKNttttttttttttttttttttttttttttttttttttttttttqTTTJAFpAFttttttttttBFttttttttttttttttttttttttttttttttttttttttttRLaaQQJtttttttttttttJRNttttttttttttttttttttttttttttttttttttttttpICSIKABAttttttttttttKCJttttttttttttttttttttttttttttttttttttttttoAARSQAJttttttttttttpYARNtttttttttttttttttttttttttttttttttttttttIACLSIABttttttttttttpIAAJFtttttttttttttttttttttttttttttttttttVtpQNJKSIIAIJtoNtttttttqIIAIRtttttttttttttttttttttttttttttttttttpBJApACABAALaACKFttttttCBAAACRtttttttttttttttttttttttttttttttttttIINIJIASIIJZSTjRNttttpKAAQAAKRttttttttttttttttttttttttttttttttttttttpCKJAKALKbcSFttttJRAACAAAKNtttttttttttttttttttttttttttttttttttttRASQIISQTkbZItttpRQAIBIIIAZttttttttttttttttttttttttttttttttttttpJABAACRBKTaJAClKKDAAIAIAAACFtttttttttttttttttttttttttttttttttttqQIAAJaSZJSRIKaUZRZAAIAJAIIBNttttttttttttttttttttttttttttttttttpBBAACSStTJBBDIBKbBQAAIABABBAJtttttttttttttttttttttttttttttttttpRSSRQJdtqRJIACQQILbQAIJIAQJIIJtttttttttttttttttttttttttttttttttLSJCTRLttSKAABJYJAAUIAABBAJBBBBFtttttttttttttttttttttttttttttttpTiJSbKdttqQAAJjiZIACgAIAIIBJJJINtttttttttttttttttttttttttttttttpTZSccSSttaBAACccLJBBSBABABBJJBABtttttttttttttttttttttttttttttttKSRSkhSatqJIAAJccRSIILQIBBIIIJJJINttttttttttttttttttttttttttttttBJBTckJLSJIAAABLTRCSACZJBBBAACJJAFtttttttttttttttttttttSRZtttttsaIATbiKIIIIAIAAJKZBbQJbJBIJIBKRRIIttttttttttttttttttttpABKJttttjMIBJSIMSJBJAAAABCaBURJLRBBJBBBRJBBttttttttttttttttttttNtAJSQttthBhIJIBacjRRIIAJIBUJUiJKiIIJQIIRNpItttttttttttttttttttttpAAAKBKLJAZAAAMSJSJKAABBJALYDbJBUIBJJAAKNtAFttttttttttttttttttttpIAAKRSiKSYAAKZAAAJIIIJJJIRbJbYBTYJSRJIJVtoNttttttttttttttttttttBAAAAKSZSUIAABIACIABAABBJAKMQLRBKZBKSJBBttpFttttttttttttttttttttRIIIAILJTTIAAJAQSRIIIAJJRIJSiLhIbiISRRKJNttNtttttttttttttttttttpIAAIBAZCTTABAABAAAAAABBBKIBKZBSAcaBKSJBBFttFtttttttttttttttttttpIBIIJKYKRaIJIAAIAAAAAJRRSRBRhASIUQARSRJINttNtttttttttttttttttttqABABBLCBIaBJIAABBJAAAKJKKKBKrALZCJBKSSJJFttFtttttttttttttttttttQAIIJBhZIBZJRJIAJJRAIIKSRJRKSshLiJZJSaSQINttNttttttttttttttttttqIBAABEURADJJJCAABAAABACKNttqNtrDSAZBKKSJAFttFttttttttttttttttttpIIAIJbbQILRRJJAAAAJIBIBRtttpVtrSaITJSRaRINtttttttttttttttttttttJBBBBCaaBJTJJJBBABBRABABNtttqttiTbJDZKJSJAFtttttttttttttttttttttIIJIJTTYKJiRaRRAIJJRIIJAtttttttiajSJbSVaRINttttttttttttttttttttpABJAKabBJDSKJKIAABBABAAAttttttsLJTZQDKNKJBFttttttttttttttttttttpIJIITSZIITSSVtJIIIIAIAIAttttttsSIKYRLZtpJINttttttttttttttttttttCBJJBaSAABaKJttBAAAAAABAAtttqttrRLRaDJdttBBFttttttttttttttttttttJJRQKaZIJTiRtttAJIAAAIIAItttqVtiRliRJYlttpJNttttttttttttttttttttABCJLLIBKMKKttpABAAAAAAAAFttKNtiBlTIZAdttpJFttttttttttttttttttttIJSaiZAKRlRVttoIAQAAAAAAANttRVtrIibQZJltttINttttttttttttttttttttIBSTbQCCLtqNttABAAAAAAAAABttKNtsJaaBJBltttBFttttttttttttttttttttIJabjIZJctttttIKQAAAAAABIIttSttthihLYLttttIFtttttttttttttttttttpAKZaSCZCdttttpBSIAAAAAABAAFtKtttcbZLIcttttAFtttttttttttttttttttoISbSbLhKtttttoKbQQAAAAAJIIAqRttskjZkSlttttoNtttttttttttttttttttpBKTLULjDttKttoLTRQAAAAACIBBCKNttaccTctttttpFtttttttttttttttttttpJSiaTSbLtpRttJVqQQIAAAIJIBAISVtqbKlJttttttoNtttttttttttttttttttpBMLJBMUMtqKttCNrAIAAAAAKBBABKKKKLctAttttttoFtttttttttttttttttttpJaSIRTbltSRttKdqJQIIAAAJIBAJRSRRVttIttttttoNtttttttttttttttttttpCaQDiLSttKJtpLtqKIApAAABJBABKKNttttFttttttoNtttttttttttttttttttoLTIcgLSttRVtpbVqaIItAIIJRBIARVttttpNttttttottttttttttttttttttttpDJAUYLNttqNtpctVqBAtABABBBAABBttttotttttttottttttttttttttttttttpLJAKYaVtttVtpcVVqIBtIAAJIJAABRttttptttttttotttttttttttttttttttttLJCTaattttttJUVtqAFtoABJJBAAABFtttFtttttttFtttttttttttttttttttttTJQkktttttttITVtaINtoIJQIIIAAJNtttttttttttVtttttttttttttttttttttEKbUttttttttoCqTJAtttABJAApAABFtttttttttttttttttttttttttttttttttKhltttttttttoJtJIBtttIJRAItIAANtttttttttttttttttttttttttttttttttBkltttttttttpBtIABtttABJBAtpAAFtttttttttttttttttttttttttttttttttotttttttttttoKtQIFtttIJIIAtoIANtttttttttttttttttttttttttttttttttptttttttttttoNtQAFtttoAABBtpAAFttttttttttttttttttttttttttttttttttNttttttttttpSSQINtttoAAJFtpAANttttttttttttttttttttttttttttttttttNttttttttttpBABIttttoAAJFtpAAFtttttttttttttttttttttttttttttttttttttttttttttoIABJttttoABRNtJIAttttttttttttttttttttttttttttttttttttttttttttttoBABBttttoABJFtJAAttttttttttttttttttttttttttttttttttttttttttttttoIAIFttttIAAANKZANttttttttttttttttttttttttttttttttttttttttttttttpIAABtttpBAAABKIANttttttttttttttttttttttttttttttttttttttttttttttKQAIJtttpIIAASRIAtttttttttttttttttttttttttttttttttttttttttttttttLJAAItttoBAAAJAAFtttttttttttttttttttttttttttttttttttttttttttttttSQAJItttoIAAIQIBtttttttttttttttttttttttttttttttttttttttttttttttpSJABIJJJQAAABABttttttttttttttttttttttttttttttttttttttttttttttRSRRRIBQSaSQAIAJIttttttttttttttttttttttttttttttttttttttttttttttKKKJBKABAJKKJAAABttttttttttttttttttttttttttttttttttttttttttttttRRIIJJKIIAIIJJIANttttttttttttttttttttttttttttttttttttttttttttttJIABtpBCIABBBBJAAFtttttttttttttttttttttttttttttttttttttttttttttpQIttttJJQAFtttoIAtttttttttttttttttttttttttttttttttttttttttttttpJFtttttABIAFtttoABtttttttttttttttttttttttttttttttttttttttttttttQNttttttoBIINtttJAAttttttttttttttttttttttttttttttttttttttttttttpBtttttttpBIAtttpAAFttttttttttttttttttttttttttttttttttttttttttttIttttttttoAQAtttoIABttttttttttttttttttttttttttttttttttttttttttttFtttttttttAAAtttoAAAtttttttttttttttttttttttttttttttttttttttttttottttttttttIIAttttAIAttttttttttttttttttttttttttttttttttttttttttttttttttttttAAAttttAAAttttttttttttttttttttttttttttttttttttttttttttttttttttttIIAttttoIANtttttttttttttttttttttttttttttttttttttttttttttttttttttAAAttttoBAFtttttttttttttttttttttttttttttttttttttttttttttttttttttIIINtttIIIItttttttttttttttttttttttttttttttttttttttttttttttttttttABBFtttBIJBBttttttttttttttttttttttttttttttttttttttttttttttttttttIJBNtttIJJJItttttttttttttttttttttttttttttttttttttttttttttttttttpABAFtttAJABFtttttttttttttttttttttttttttttttttttttttttttttttttttoBRINtttoINNtttttttttttttttttttttttttttttttttttttttttttttttttttttBKIFtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttoJaINtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttpSSABtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttJaRQAtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttKKKIFttttttttttttttttttttttttttttttttttttttttttttttttttttttttttpSLKQNttttttttttttttttttttttttttttttttttttttttttttttttttttttttttKKKCJFtttttttttttttttttttttttttttttttttttttttttttttttttttttttttpIQRJRNtttttttttttttttttttttttttttttttttttttttttttttttttttttttttBCKRDRFttttttttttttttttttttttttttttttttttttttttttttttttttttttttpQJKIKItttttttttttttttttttttttttttttttttttttttttttttttttttttttttpBIJACAtttttttttttttttttttttttttttttttttttttttttttttttttttttttttopIQNRNttttttttttttttttttttttttttttttttttttttttttttttttttttttttttptFtBtttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttNttttttttttttttttttttttttttttttttttttttt"};
+for(const k in DEMON128){const bin=atob(DEMON128[k]),a=new Uint32Array(16384),f=new Uint32Array(16384);let bit=0;
+ for(let i=0;i<16384;i++){let v=0;for(let j=0;j<3;j++){v=(v<<1)|((bin.charCodeAt(bit>>3)>>(7-(bit&7)))&1);bit++;}if(v<5){a[i]=PK5(G5[v]);f[i]=PK5(204);}}SP[k]=a;SPF[k]=f;}
+const MT={
+ Z:{name:'ZOMBIE',hp:30,sp:1.4,h:1.3,aggro:9,reach:1.1,dmg:8,idle:'zw',walk:['zw','zm'],wt:0.35,wup:0.45},
+ D:{name:'DEMON',hp:140,sp:2.1,h:2.3,aggro:14,reach:2.4,dmg:20,idle:'dw',walk:['dw','dw'],wt:0.28,wup:0.55}, // Ogre-style movement and melee; occasional secondary fireball
+ H:{name:'HOODED',hp:45,sp:1.7,h:1.4,aggro:13,reach:0,dmg:10,idle:'h0',walk:['h0','h0'],wt:0.3,wup:0.7}};
+const MON=[],BOLT=[],ITEM=[],EN={coin:0,potion:0,kill:0,cd:0,swing:0,pend:0,hurt:0,msg:'',msgT:0,spT:1,tgt:null,tgtT:0,gd:0,shv:0,blk:0,shake:0,fT:1,bn:0,px:null,py:0,bob:0,kp:0};
+const BIG=m=>m.k==='D';
+const say=s=>{EN.msg=s;EN.msgT=2;};
+const clearEnt=()=>{MON.length=BOLT.length=ITEM.length=FIRE.length=PART.length=0;};
+function go(m,s){m.st=s;m.t=0;} // state transition
+function mMove(m,dx,dy){if(dx&&free(m.x+dx,m.y))m.x+=dx;if(dy&&free(m.x,m.y+dy))m.y+=dy;}
+function newMon(k,x,y){return {k,x,y,hp:MT[k].hp,st:'SPAWN',t:0,an:0,mv:0,fl:0,flip:Math.random()<0.5?1:0,wa:0,wd:0,rest:Math.random()*2,cool:1,fc:k==='D'?4.5+Math.random()*2.5:2+Math.random()*2,sd:Math.random()<0.5?1:-1,d:99};}
+function hurtP(n,sx,sy){let bl=0;if(sx!==undefined&&EN.gd){let a=Math.atan2(sy-P.y,sx-P.x)-P.a;a=Math.atan2(Math.sin(a),Math.cos(a));if(Math.abs(a)<1.2){n=Math.round(n*0.2);bl=1;EN.blk=0.25;sfx('clang');sparkBurst(P.x+Math.cos(P.a)*0.6,P.y+Math.sin(P.a)*0.6,0.45,4);}} // shield: frontal hits do 20%
+ P.hp-=n;if(!bl){EN.hurt=0.35;sfx('hurt');}if(P.hp<=0){P.hp=100;EN.coin>>=1;clearEnt();say('YOU DIED');sfx('die');teleport(0,0,0.5,0.5);}}
+function drop(m){const n=BIG(m)?5:m.k==='H'?2:Math.random()<0.7?1:0;
+ for(let i=0;i<n;i++)ITEM.push({k:'c',x:m.x+(Math.random()-0.5)*1.2,y:m.y+(Math.random()-0.5)*1.2,t:Math.random()*3});
+ if(BIG(m)||Math.random()<(m.k==='H'?0.3:0.1))ITEM.push({k:'p',x:m.x,y:m.y,t:0});}
+function dmgM(m,n,ux,uy){if(m.st==='DEAD')return;m.hp-=n;m.fl=0.12;sfx('hit');sparkBurst(m.x,m.y,0.5,6);EN.tgt=m;EN.tgtT=3;
+ if(m.hp<=0){go(m,'DEAD');drop(m);sfx('die',0.7);explode(m.x,m.y,BIG(m)?0.8:0.4,BIG(m)?1.4:0.7);EN.kill++;return;}
+ if(BIG(m)&&(m.st==='WINDUP'||m.st==='STRIKE'||m.st==='CAST'))return; // the demon does not flinch mid-attack
+ go(m,'HURT');mMove(m,ux*0.5,uy*0.5);}
+/* finite state machine. SPAWN -> IDLE(wander) -> ALERT -> CHASE; demon melee is primary, CAST is a cooldown-gated secondary ranged attack. HOODED keeps distance and casts. any -> HURT -> CHASE, any -> DEAD */
+function think(m,dt){const T=MT[m.k],dx=P.x-m.x,dy=P.y-m.y,d=Math.hypot(dx,dy)||1e-6,ux=dx/d,uy=dy/d,s=T.sp*dt;m.t+=dt;m.d=d;m.fl-=dt;m.mv=0;
+ switch(m.st){
+ case 'SPAWN':if(m.t>=0.9)go(m,'IDLE');break;
+ case 'IDLE':
+  if(m.wd>0){m.wd-=dt;mMove(m,Math.cos(m.wa)*s*0.4,Math.sin(m.wa)*s*0.4);m.mv=1;}
+  else{m.rest-=dt;if(m.rest<=0){m.wa=Math.random()*6.283;m.wd=1+Math.random()*2;m.rest=1+Math.random()*3;}}
+  if(d<T.aggro)go(m,'ALERT');break;
+ case 'ALERT':if(m.t>=0.45)go(m,'CHASE');break;
+ case 'CHASE':
+  if(d>T.aggro*1.8){go(m,'IDLE');break;}
+  if(m.k==='H'){m.cool-=dt;
+   if(d>7){mMove(m,ux*s,uy*s);m.mv=1;}
+   else if(d<4){mMove(m,-ux*s,-uy*s);m.mv=1;}
+   else{mMove(m,-uy*m.sd*s*0.6,ux*m.sd*s*0.6);m.mv=1;if(m.cool<=0)go(m,'CAST');}
+  }else{mMove(m,ux*s,uy*s);m.mv=1;if(d<T.reach)go(m,'WINDUP');else if(m.k==='D'&&d>5.5&&d<12.5){m.fc-=dt;if(m.fc<=0)go(m,'CAST');}}
+  break;
+ case 'WINDUP':if(m.t>=T.wup){go(m,'STRIKE');sfx('swing',0.5);if(BIG(m))shock(m.x+ux*0.9,m.y+uy*0.9);if(d<T.reach+0.5)hurtP(T.dmg,m.x,m.y);}break;
+ case 'STRIKE':if(m.t>=(BIG(m)?0.3:0.15))go(m,'RECOVER');break;
+ case 'RECOVER':if(m.t>=(BIG(m)?0.9:0.6))go(m,'CHASE');break;
+ case 'CAST':if(m.k==='D'){if(Math.random()<dt*45){const sd=Math.random()<0.5?-1:1;pp('f',m.x-DY*sd*0.6+ux*0.2,m.y+DX*sd*0.6+uy*0.2,1.85+Math.random()*0.35,0,0,-0.3,0.3,0.4,1);} // charging: flames gather at the raised hands
+   if(m.t>=0.65){BOLT.push({x:m.x+ux*0.45,y:m.y+uy*0.45,vx:ux*6.2,vy:uy*6.2,t:0,fire:1,dmg:12,z:2.0});sfx('bolt',0.85);m.fc=4.5+Math.random()*3;go(m,'RECOVER');}break;}
+  if(Math.random()<dt*30)pp('f',m.x+ux*0.3,m.y+uy*0.3,0.55,0,0,0.5,0.3,0.3);if(m.t>=T.wup){BOLT.push({x:m.x,y:m.y,vx:ux*6,vy:uy*6,t:0});sfx('bolt',0.8);m.cool=1.6+Math.random();m.sd=-m.sd;go(m,'COOL');}break;
+ case 'COOL':mMove(m,-uy*m.sd*s*0.6,ux*m.sd*s*0.6);m.mv=1;if(m.t>=0.9)go(m,'CHASE');break;
+ case 'HURT':if(m.t>=0.35)go(m,'CHASE');break;
+ case 'DEAD':if(m.t>=0.9)m.rm=1;break;}
+ if(m.mv)m.an+=dt;}
+function strike(){for(const m of MON){if(m.st==='DEAD'||m.st==='SPAWN')continue;const dx=m.x-P.x,dy=m.y-P.y,d=Math.hypot(dx,dy);if(d>2.5)continue;
+ let a=Math.atan2(dy,dx)-P.a;a=Math.atan2(Math.sin(a),Math.cos(a));if(Math.abs(a)>0.75&&d>0.7)continue;dmgM(m,10+(Math.random()*8|0),dx/d,dy/d);}}
+function entUpdate(dt){
+ if(EN.px!==null){const j=Math.hypot(P.x-EN.px,P.y-EN.py);if(j>5)clearEnt();else EN.bob+=j*3;} // a jump = teleport: forget the old monsters
+ EN.px=P.x;EN.py=P.y;fxUpdate(dt);EN.gd=!!(K.KeyB||K.ShiftLeft||K.ShiftRight||K.KeyU);EN.shv+=((EN.gd?1:0)-EN.shv)*Math.min(1,dt*14);EN.blk-=dt;EN.cd-=dt;EN.swing-=dt;EN.hurt-=dt;EN.msgT-=dt;EN.tgtT-=dt;
+ if((K.Space||K.KeyI)&&EN.cd<=0&&!EN.gd){EN.cd=0.45;EN.swing=0.3;EN.pend=1;sfx('swing');}
+ if(EN.pend&&EN.swing<=0.15){EN.pend=0;strike();}
+ if(K.KeyK&&!EN.kp){EN.kp=1;if(EN.potion>0){EN.potion--;P.hp=Math.min(100,P.hp+40);say('POTION +40');sfx('potion');sparkBurst(P.x+Math.cos(P.a)*0.8,P.y+Math.sin(P.a)*0.8,0.4,10);}}if(!K.KeyK)EN.kp=0;
+ EN.spT-=dt; // spawner: a ring 11..23 cells around the player, on land
+ if(EN.spT<=0){EN.spT=0.5+Math.random()*0.8;
+  if(MON.length<9)for(let i=0;i<8;i++){const a=Math.random()*6.283,r=11+Math.random()*12,x=P.x+Math.cos(a)*r,y=P.y+Math.sin(a)*r;
+   if(!free(x,y))continue;cell(Math.floor(x),Math.floor(y));if(((CODE>>4)&3)>=2||(CODE&7)<=1)continue;
+   const q=Math.random();let k=q<0.04+0.03*info.lv?'D':q<0.3?'H':'Z';if(BIG({k})&&MON.some(BIG))k='Z';MON.push(newMon(k,x,y));dust(x,y,6);break;}}
+ for(const m of MON)think(m,dt);
+ for(let i=0;i<MON.length;i++)for(let j=i+1;j<MON.length;j++){const a=MON[i],b=MON[j];if(a.st==='DEAD'||b.st==='DEAD')continue;
+  const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);if(d<0.7&&d>1e-4){const p=(0.7-d)*0.3/d;mMove(a,-dx*p,-dy*p);mMove(b,dx*p,dy*p);}}
+ for(let i=MON.length-1;i>=0;i--){const m=MON[i];if(m.rm||Math.hypot(m.x-P.x,m.y-P.y)>32)MON.splice(i,1);}
+ for(let i=BOLT.length-1;i>=0;i--){const b=BOLT[i];b.t+=dt;b.x+=b.vx*dt;b.y+=b.vy*dt;if(b.fire){if(b.z>0.5)b.z=Math.max(0.5,b.z-dt*2.5);if(rn()<dt*70)pp('f',b.x,b.y,b.z,0,0,0.3,0.4,0.5);if(rn()<dt*14)smokeP(b.x,b.y,b.z,0.4);}else trail(b,dt);
+  let dead=b.t>3.5||blocked(Math.floor(b.x),Math.floor(b.y));if(!dead&&Math.hypot(b.x-P.x,b.y-P.y)<0.5){hurtP(b.dmg||10,b.x,b.y);dead=true;}if(dead){if(b.fire)explode(b.x,b.y,0.5,1.0);else explode(b.x,b.y,0.35,0.6);BOLT.splice(i,1);}}
+ for(let i=ITEM.length-1;i>=0;i--){const it=ITEM[i];it.t+=dt;
+  if(Math.hypot(it.x-P.x,it.y-P.y)<0.9){if(it.k==='c'){EN.coin++;say('COIN +1');sparkBurst(it.x,it.y,0.3,5);sfx('coin');}else{EN.potion++;say('POTION GET');}ITEM.splice(i,1);}else if(it.t>60)ITEM.splice(i,1);}}
+function entShift(dx,dy){for(const L of [MON,BOLT,ITEM,FIRE,PART])for(const o of L){o.x-=dx;o.y-=dy;}EN.px-=dx;EN.py-=dy;} // floating-origin rebase
+function entList(){const L=[],dd=o=>(o.x-P.x)*(o.x-P.x)+(o.y-P.y)*(o.y-P.y);
+ for(const o of MON)L.push({d:dd(o),t:0,o});for(const o of BOLT)L.push({d:dd(o),t:1,o});for(const o of ITEM)L.push({d:dd(o),t:2,o});for(const o of FIRE)L.push({d:dd(o),t:4,o});for(const o of PART)L.push({d:dd(o),t:3,o});
+ L.sort((a,b)=>b.d-a.d);return L;}
+function drawEnt(e){if(e.t>=3){drawFxE(e);return;}const o=e.o;if(e.t===1&&o.fire){drawFireball(o);return;}let tex,qh,hw,fl=0;
+ if(e.t===0){const T=MT[o.k];let n=T.idle;
+  if(o.k==='D'){n=o.st==='WINDUP'?'dr':o.st==='STRIKE'?'dp':o.st==='CAST'?'dc':o.st==='HURT'?'dh':'dw';} // stance / punch / cast / hurt / walk poses
+  else if(o.k==='H'){if(o.st==='CAST')n='h1';}
+  else if(o.mv)n=T.walk[(o.an/T.wt|0)&1];
+  tex=(o.fl>0?SPF:SP)[n];qh=T.h;hw=T.h/2;fl=(o.k==='D'&&o.mv)?(((o.an/T.wt)|0)&1)^o.flip:o.flip; // the demon walks by mirroring its sprite each step
+  if(o.st==='SPAWN')qh*=Math.min(1,o.t/0.9); // rises out of the ground
+  else if(o.st==='DEAD'){qh*=Math.max(0.12,1-o.t/0.6);if(o.t>0.3&&((o.t*14|0)&1))return;} // collapses and blinks out
+  else if(o.st==='WINDUP'||(o.st==='CAST'&&o.k==='D'))qh*=1+0.1*Math.min(1,o.t/T.wup);
+  else if(o.mv)qh*=1+0.03*Math.sin(o.an*12);
+ }else if(e.t===1){tex=SP.hb;qh=1;hw=0.5*(0.9+0.1*Math.sin(o.t*30));fl=(o.t*20|0)&1;}
+ else{const c=o.k==='c';tex=c?SP.co:SP.po;qh=c?0.4:0.5;hw=qh/2*(c?Math.max(0.1,Math.abs(Math.cos(o.t*4))):1);} // the coin spins
+ cell(Math.floor(o.x),Math.floor(o.y));cfog((CODE&7)===6?1:0);
+ const rx=PLX/PL*hw,ry=PLY/PL*hw;seg(o.x-rx,o.y-ry,o.x+rx,o.y+ry,0,1,tex,qh,0,fl);}
+function entFx(ctx,cv,pass){if(pass!==1){ctx.save();ctx.imageSmoothingEnabled=false;
+ if(EN.shake>0){const a=EN.shake*10;ctx.drawImage(cv,((Math.random()-.5)*a)|0,((Math.random()-.5)*a)|0);}
+ const sw=EN.swing>0?1-EN.swing/0.3:-1,e=sw<0?0:Math.min(1,sw*1.25),sv=EN.shv;
+ {const s=sv>0.5?128:96,cx=Math.round(48+sv*86+(EN.blk>0?Math.sin(EN.blk*90)*3:0)),cy=Math.round(H-14-sv*58);ctx.save();ctx.translate(cx,cy);ctx.drawImage(WSH,-s/2,-s/2,s,s);ctx.restore();} // shield (left hand): raised when guarding
+ const hx=sw>=0?W-62-e*20:W-62,hy=(sw>=0?H+14-Math.sin(e*Math.PI)*16:H+14+Math.abs(Math.sin(EN.bob))*4)+sv*40,ba=q=>-Math.PI/2+0.55-1.95*q; // hand position; blade direction angle
+ if(sw>=0&&e>0){const al=0.85*(1-Math.max(0,(e-0.7)/0.3));if(al>0){ctx.lineCap='round';for(const [lw,c2,r] of [[9,'#666',112],[4,'#ccc',118]]){ctx.globalAlpha=al;ctx.strokeStyle=c2;ctx.lineWidth=lw;{const q0=ba(Math.max(0,e-0.55)),q1=ba(e);ctx.beginPath();ctx.moveTo(hx+Math.cos(q0)*r,hy+Math.sin(q0)*r);ctx.lineTo(hx+Math.cos(q1)*r,hy+Math.sin(q1)*r);ctx.stroke();}}ctx.globalAlpha=1;}} // slash trail: straight lines between the blade-tip positions (trailing behind the blade)
+ ctx.translate(Math.round(hx),Math.round(hy));
+ ctx.rotate(sw>=0?0.55-1.95*e:-0.2+Math.sin(EN.bob)*0.04);ctx.drawImage(WCV,-64,-128,128,128);ctx.restore();} // sword (right hand)
+ ctx.save();if(pass!==1&&EN.hurt>0){ctx.fillStyle='rgba(204,204,204,'+Math.min(0.5,EN.hurt)+')';ctx.fillRect(0,0,W,H);}
+ if(pass===0){ctx.restore();return;}
+ ctx.font='10px monospace';ctx.textBaseline='top';
+ const tx=(s,x,y,al)=>{ctx.textAlign=al||'left';ctx.fillStyle='#000';ctx.fillText(s,x+1,y+1);ctx.fillStyle='#ccc';ctx.fillText(s,x,y);};
+ tx('COIN '+EN.coin+'  POTION '+EN.potion+'  KILL '+EN.kill,4,H-13);
+ if(EN.msgT>0)tx(EN.msg,W/2,H*0.62,'center');
+ const m=EN.tgt;if(m&&EN.tgtT>0&&m.hp>0){const t0=MT[m.k],w=100,x=(W-w)/2;tx(t0.name,W/2,28,'center');ctx.fillStyle='#000';ctx.fillRect(x-1,39,w+2,6);ctx.fillStyle='#666';ctx.fillRect(x,40,w,4);ctx.fillStyle='#ccc';ctx.fillRect(x,40,w*m.hp/t0.hp,4);}
+ ctx.restore();}
+/* ===== EFFECTS: fire / explosion / smoke / sparks / cross flares (procedural 5-grey textures, world-space particles) ===== */
+let ZOFF=0,TN=32;const rn=Math.random,PART=[],FIRE=[],FXT={fl:[],sm:[],ex:[]};
+{const hs=(x,y,s)=>{let h=Math.imul((x*374761393+y*668265263+s*2147483647)|0,1274126177);h^=h>>>13;h=Math.imul(h,1274126177);return ((h^(h>>>16))>>>0)/4294967296;};
+ const mk=fn=>{const a=new Uint32Array(1024);for(let y=0;y<32;y++)for(let x=0;x<32;x++){const v=fn(x,y);if(v>=0)a[y*32+x]=PK5(G5[v]);}return a;};
+ for(let f=0;f<4;f++)FXT.fl.push(mk((x,y)=>{const u=(x-15.5)/15.5,v=1-y/31;if(v>0.97)return -1; // flame tongue, 4 frames
+  const sway=0.18*Math.sin(v*6+f*1.6)*v,w=0.62*Math.pow(1-v,0.7)*(1+0.2*Math.sin(v*11+f*2.3))+0.05,dd=Math.abs(u-sway)/w;if(dd>=1)return -1;
+  const it=(1-dd)*(1-v*0.55)+hs(x,y,f)*0.25-0.1;return it>0.7?4:it>0.45?3:it>0.22?2:it>0.05?1:-1;}));
+ for(let k=0;k<3;k++)FXT.sm.push(mk((x,y)=>{const u=(x-15.5)/15.5,v=(y-15.5)/15.5,r=Math.hypot(u,v)+(hs(x>>1,y>>1,k+9)-0.5)*0.5; // smoke puff: dense -> thin (dithered)
+  if(r>0.85)return -1;if(k>0&&hs(x,y,k)<k*0.28)return -1;if(k===2&&((x+y)&1))return -1;return r<0.35?3:r<0.6?2:1;}));
+ for(let f=0;f<6;f++)FXT.ex.push(mk((x,y)=>{const u=(x-15.5)/15.5,v=(y-15.5)/15.5,r=Math.hypot(u,v),Rr=0.35+f*0.11+(hs(x>>1,y>>1,f+20)-0.5)*0.35; // explosion: ball -> hollow ring -> embers
+  if(r>Rr||r<(f<2?0:(f-1)*0.17)||(f>=4&&((x+y)&1)))return -1;const h=(Rr-r)/Rr,c=h>0.65?4:h>0.4?3:h>0.2?2:1;return Math.max(1,c-(f>3?1:0)-(f>4?1:0));}));
+ FXT.fx=mk((x,y)=>{const u=Math.abs((x-15.5)/15.5),v=Math.abs((y-15.5)/15.5),d=Math.max(u,v); // cross flare (+)
+  if(Math.hypot(u,v)<0.22)return 4;if((v<0.06+0.1*(1-u)&&u<0.98)||(u<0.06+0.1*(1-v)&&v<0.98))return d<0.3?4:d<0.6?3:2;return -1;});
+ FXT.sk=mk((x,y)=>{const dx=Math.abs(x-15.5),dy=Math.abs(y-15.5);return ((dx<1&&dy<8)||(dy<1&&dx<8))?(dx+dy<2?4:3):-1;}); // spark (+)
+}
+function pp(k,x,y,z,vx,vy,vz,life,size,cross){if(PART.length<240)PART.push({k,x,y,z,vx,vy,vz,t:0,life,size,cross:cross?1:0,s:(rn()*8)|0});}
+function fireP(x,y,z,sz){pp('f',x+(rn()-.5)*.2,y+(rn()-.5)*.2,z,(rn()-.5)*.5,(rn()-.5)*.5,0.8+rn(),0.5+rn()*0.3,sz||0.45);}
+function smokeP(x,y,z,sz){pp('m',x,y,z,(rn()-.5)*.6,(rn()-.5)*.6,0.6+rn()*0.6,1.4+rn()*0.8,sz||0.6);}
+function sparkBurst(x,y,z,n){for(let i=0;i<n;i++){const a=rn()*6.283,s=2+rn()*3;pp('k',x,y,z,Math.cos(a)*s,Math.sin(a)*s,2+rn()*3,0.5+rn()*0.4,0.22);}}
+function dust(x,y,n){for(let i=0;i<n;i++){const a=rn()*6.283;pp('m',x+Math.cos(a)*.3,y+Math.sin(a)*.3,0.15,Math.cos(a)*1.2,Math.sin(a)*1.2,0.3,0.9,0.5);}}
+const CROSS4=[[1,0],[-1,0],[0,1],[0,-1]];
+function explode(x,y,z,sc){sfx('boom',Math.min(1,sc)/(1+Math.hypot(x-P.x,y-P.y)*0.15));pp('e',x,y,z,0,0,0.2,0.7,1.6*sc);pp('x',x,y,z,0,0,0,0.28,2.4*sc);
+ for(let i=0;i<8;i++){const a=rn()*6.283,s=(1+rn())*sc;pp('f',x,y,z,Math.cos(a)*s,Math.sin(a)*s,1+rn()*1.5,0.5+rn()*0.3,0.7*sc,1);}
+ for(const [dx,dy] of CROSS4)for(let j=1;j<=3;j++)pp('k',x,y,z,dx*j*2.2*sc,dy*j*2.2*sc,0.8,0.45,0.22); // cross burst
+ for(let i=0;i<6;i++)smokeP(x+(rn()-.5)*.6*sc,y+(rn()-.5)*.6*sc,z+0.2,0.8*sc);
+ EN.shake=Math.max(EN.shake,0.15*sc+0.05);}
+function shock(x,y){sfx('shock',1/(1+Math.hypot(x-P.x,y-P.y)*0.1));pp('x',x,y,0.3,0,0,0,0.3,1.8);EN.shake=Math.max(EN.shake,0.4); // ground slam: 8-way dust ring + cross flare
+ for(let j=0;j<8;j++){const a=j*Math.PI/4;pp('m',x,y,0.12,Math.cos(a)*2.5,Math.sin(a)*2.5,0.2,0.7,0.5);}
+ for(const [dx,dy] of CROSS4)pp('k',x,y,0.2,dx*5,dy*5,1.5,0.4,0.22);}
+function trail(b,dt){if(rn()<dt*45)pp('f',b.x,b.y,0.35,0,0,0.3,0.35,0.35);if(rn()<dt*12)smokeP(b.x,b.y,0.35,0.35);}
+function fxUpdate(dt){EN.shake=Math.max(0,EN.shake-dt);
+ for(let i=PART.length-1;i>=0;i--){const p=PART[i];p.t+=dt;if(p.t>=p.life){PART.splice(i,1);continue;}
+  p.x+=p.vx*dt;p.y+=p.vy*dt;p.z+=p.vz*dt;
+  if(p.k==='k'){p.vz-=9*dt;if(p.z<0){p.z=0;p.vz*=-0.4;p.vx*=0.6;p.vy*=0.6;}}
+  else if(p.k==='m'){const d=1-1.2*dt;p.vx*=d;p.vy*=d;p.vz*=1-0.6*dt;}}
+ EN.fT-=dt; // bonfires: spawn on land 6..20 cells away
+ if(EN.fT<=0){EN.fT=2+rn()*3;if(FIRE.length<3){const a=rn()*6.283,r=6+rn()*14,x=P.x+Math.cos(a)*r,y=P.y+Math.sin(a)*r;
+  if(free(x,y)){cell(Math.floor(x),Math.floor(y));if(((CODE>>4)&3)<2&&(CODE&7)>1)FIRE.push({x,y,s:(rn()*8)|0,em:0,sm:0});}}}
+ let near=false;
+ for(let i=FIRE.length-1;i>=0;i--){const f=FIRE[i];if(Math.hypot(f.x-P.x,f.y-P.y)>34){FIRE.splice(i,1);continue;}
+  if(Math.hypot(f.x-P.x,f.y-P.y)<0.8)near=true;
+  f.em-=dt;if(f.em<=0){f.em=0.12;pp('k',f.x,f.y,0.5,(rn()-.5)*0.8,(rn()-.5)*0.8,2+rn()*2,0.8,0.18);fireP(f.x,f.y,0.4,0.3);} // embers + licking flames
+  f.sm-=dt;if(f.sm<=0){f.sm=0.3;smokeP(f.x,f.y,1.0,0.6);}}
+ if(near){EN.bn-=dt;if(EN.bn<=0){EN.bn=0.5;hurtP(3);say('BURNING');}}else EN.bn=0.3;}
+function drawFireball(o){const z=o.z||0.5,q=0.75+0.1*Math.sin(o.t*40);cell(Math.floor(o.x),Math.floor(o.y));cfog((CODE&7)===6?1:0); // fireball: glowing core + two crossed flame planes
+ ZOFF=Math.max(0,z-q/2);let hw=q/2,rx=PLX/PL*hw,ry=PLY/PL*hw;seg(o.x-rx,o.y-ry,o.x+rx,o.y+ry,0,1,FXT.ex[(o.t*14|0)&1],q,0,0);
+ const t2=FXT.fl[((o.t*12)|0)&3],q2=1.1;ZOFF=Math.max(0,z-0.35);hw=q2/2;seg(o.x-hw,o.y,o.x+hw,o.y,0,1,t2,q2,0,0);seg(o.x,o.y-hw,o.x,o.y+hw,0,1,t2,q2,0,0);ZOFF=0;}
+function drawFxE(e){const o=e.o;let tex,qh,z=0,cross=0;
+ if(e.t===4){tex=FXT.fl[((EN.clk*10+o.s)|0)&3];qh=1.0;cross=1;} // bonfire: two crossed flame planes (+)
+ else{const f=o.t/o.life;z=o.z;
+  if(o.k==='f'){tex=FXT.fl[((o.t*12+o.s)|0)&3];qh=o.size*(1-f*0.6);cross=o.cross;}
+  else if(o.k==='m'){tex=FXT.sm[Math.min(2,(f*3)|0)];qh=o.size*(0.6+f*0.9);}
+  else if(o.k==='e'){tex=FXT.ex[Math.min(5,(f*6)|0)];qh=o.size;}
+  else if(o.k==='x'){tex=FXT.fx;qh=o.size*(0.4+f*0.6);}
+  else{tex=FXT.sk;qh=o.size*(1-f*0.5);}}
+ cell(Math.floor(o.x),Math.floor(o.y));cfog((CODE&7)===6?1:0);ZOFF=Math.max(0,z-qh/2);const hw=qh/2;
+ if(cross){seg(o.x-hw,o.y,o.x+hw,o.y,0,1,tex,qh,0,0);seg(o.x,o.y-hw,o.x,o.y+hw,0,1,tex,qh,0,0);}
+ else{const rx=PLX/PL*hw,ry=PLY/PL*hw;seg(o.x-rx,o.y-ry,o.x+rx,o.y+ry,0,1,tex,qh,0,0);}
+ ZOFF=0;}
+/* ===== SFX: synthesized once in JS -> WAV -> HTMLAudio pools (no WebAudio; same method as the footsteps) ===== */
+let SFXC=null,VOICES=[];const MAXV=8,NV=3; // MAXV: max simultaneous effects; NV: clips per effect (same effect can overlap NV times)
+const PRI={die:5,boom:5,shock:4,hurt:4,clang:3,hit:3,bolt:2,swing:2,potion:2,coin:1},GAP={swing:0.08,hit:0.04,clang:0.05,coin:0.04,bolt:0.05,boom:0.05,shock:0.1,hurt:0.1,die:0.1,potion:0.1},LASTT={};
+const LEN={swing:0.25,hit:0.17,clang:0.33,hurt:0.28,die:0.55,boom:0.75,shock:0.55,coin:0.32,potion:0.38,bolt:0.38};
+function sEnv(tt,dur,vol){return tt<0.005?vol*tt/0.005:vol*Math.pow(0.0001/vol,(tt-0.005)/(dur-0.005));}
+function sTone(buf,type,f0,f1,dur,vol,dl){dl=dl||0;const i0=Math.floor(dl*SR),i1=Math.min(buf.length,Math.ceil((dl+dur+0.02)*SR)),fe=Math.max(20,f1);let ph=0;
+ for(let i=i0;i<i1;i++){const tt=i/SR-dl;if(tt>dur)break;ph+=f0*Math.pow(fe/f0,tt/dur)/SR;ph-=Math.floor(ph);
+  const w=type==='sine'?Math.sin(6.2831853*ph):type==='square'?(ph<0.5?1:-1):type==='triangle'?(ph<0.5?4*ph-1:3-4*ph):2*ph-1;buf[i]+=w*sEnv(tt,dur,vol);}}
+function sNoise(buf,dur,vol,f0,f1,type,q,dl){dl=dl||0;const i0=Math.floor(dl*SR),i1=Math.min(buf.length,Math.ceil((dl+dur+0.02)*SR)),fe=Math.max(20,f1);let x1=0,x2=0,y1=0,y2=0,c=[0,0,0,0,0];
+ for(let i=i0;i<i1;i++){const tt=i/SR-dl;if(tt>dur)break;if(((i-i0)&31)===0)c=biquad(type,f0*Math.pow(fe/f0,tt/dur),q||1); // filter sweep, coefficients refreshed every 32 samples
+  const x=Math.random()*2-1,y=c[0]*x+c[1]*x1+c[2]*x2-c[3]*y1-c[4]*y2;x2=x1;x1=x;y2=y1;y1=y;buf[i]+=y*sEnv(tt,dur,vol);}}
+function sRender(n){const buf=new Float32Array(Math.floor(SR*LEN[n])),T=(...a)=>sTone(buf,...a),N=(...a)=>sNoise(buf,...a);
+ switch(n){
+ case 'swing':N(0.22,0.35,500,2600,'bandpass',1.2);break; // blade whoosh
+ case 'hit':N(0.14,0.7,2200,250,'lowpass',1);T('square',170,55,0.14,0.35);break; // flesh hit
+ case 'clang':T('triangle',1250,1200,0.3,0.4);T('square',1950,1900,0.12,0.15);N(0.06,0.4,6000,3000,'highpass',1);break; // sword on shield
+ case 'hurt':T('sawtooth',230,70,0.25,0.4);N(0.16,0.4,600,150,'lowpass',1);break;
+ case 'die':T('sawtooth',320,40,0.5,0.35);N(0.4,0.3,1200,100,'lowpass',1);break;
+ case 'boom':N(0.7,0.9,1400,70,'lowpass',0.7);T('sine',95,28,0.6,0.8);break;
+ case 'shock':N(0.5,0.6,600,60,'lowpass',1);T('sine',70,25,0.5,0.9);break;
+ case 'coin':T('square',988,988,0.07,0.2);T('square',1319,1319,0.22,0.2,0.07);break;
+ case 'potion':[523,659,784,1047].forEach((f,i)=>T('triangle',f,f,0.14,0.25,i*0.07));break;
+ case 'bolt':T('sawtooth',180,900,0.35,0.25);N(0.3,0.2,400,3000,'bandpass',2);break;}
+ for(let i=0;i<buf.length;i++)buf[i]=Math.tanh(buf[i]*0.6); // master level + soft clip
+ return buf;}
+function sfxInit(){if(SFXC)return;SFXC={};for(const n in PRI){SFXC[n]=[];for(let v=0;v<NV;v++){const a=new Audio(wavUrl(sRender(n)));a.preload='auto';a._t=0;a._pri=0;SFXC[n].push(a);}}} // NV differently-noised clips per effect
+function sfx(n,v){if(!SND||!SFXC)return;v=v===undefined?1:v;if(v<0.03)return;const k=SFXC[n];if(!k)return;
+ const now=performance.now(),pr=PRI[n]||1;
+ if(now-(LASTT[n]||-1e9)<(GAP[n]||0.04)*1000)return; // same effect retriggered within a few ms: skip
+ VOICES=VOICES.filter(a=>!a.paused&&!a.ended);
+ if(VOICES.length>=MAXV){let w=0;for(let i=1;i<VOICES.length;i++){const x=VOICES[i],y=VOICES[w];if(x._pri<y._pri||(x._pri===y._pri&&x._t<y._t))w=i;}
+  if(VOICES[w]._pri>pr)return; // everything playing is more important: drop the new one
+  try{VOICES[w].pause();}catch(e){}VOICES.splice(w,1);} // steal the oldest/weakest voice
+ let a=null;const s=(Math.random()*k.length)|0;for(let j=0;j<k.length;j++){const c=k[(s+j)%k.length];if(c.paused||c.ended){a=c;break;}}
+ if(!a){a=k[0];for(const c of k)if(c._t<a._t)a=c;VOICES=VOICES.filter(x=>x!==a);} // all clips of this effect busy: restart the oldest
+ try{a.currentTime=0;a.volume=Math.min(1,v);a._t=now;a._pri=pr;const p=a.play();if(p&&p.catch)p.catch(()=>{});VOICES.push(a);LASTT[n]=now;}catch(e){}}
+/* ===== first-person gear: sword (right hand) and shield (left hand), drawn in 5 greys ===== */
+function mk5(fn,n){n=n||32;const c=document.createElement('canvas');c.width=c.height=n;const x=c.getContext('2d'),im=x.createImageData(n,n),b=new Uint32Array(im.data.buffer);
+ for(let y=0;y<n;y++)for(let X=0;X<n;X++){const v=fn(X,y);if(v>=0)b[y*n+X]=PK5(G5[v]);}x.putImageData(im,0,0);return c;}
+const WCV=mk5((x,y)=>{const dx=Math.abs(x-31.5); // sword: 64x64 sprite (drawn at 2x), long blade
+ if(y===0)return dx<1.5?0:-1;
+ if(y<=40){const h=Math.min(3,0.6+(y-1)*0.3);if(dx<h)return dx<0.8?4:(x<31.5?3:2);return dx<h+1?0:-1;} // blade + outline
+ if(y===41||y===46)return (x>=16&&x<=47)?0:-1; // cross guard
+ if(y<=45)return (x>=17&&x<=46)?(y<44?3:2):(x===16||x===47)?0:-1;
+ if(y<=57)return dx<1.5?(y%4===0?2:1):dx<2.5?0:-1; // grip
+ return dx<3.5?(y===58?3:2):dx<4.5?0:-1;},64); // pommel
+const WSH=mk5((x,y)=>{const u=x-15.5,v=y-15.5,r=Math.hypot(u,v);if(r>14.5)return -1;if(r>13)return 0;if(r>10.8)return u+v<0?4:3; // rim
+ if(r>9.8)return 0;if(Math.abs(u)<1.7||Math.abs(v)<1.7)return r<3.5?4:4-((u+v>0)?1:0)-0; // cross
+ if(r<3.5)return 3;return (u<0)===(v<0)?1:2;}); // quartered face
+/* ===== main ===== */
+addEventListener('keydown',e=>{if(e.target&&e.target.tagName==='INPUT'){if(e.code==='Enter'||e.code==='NumpadEnter')doMove();else if(e.code==='Escape')closeLoc();return;} // typing in the dialog never drives the player
+ K[e.code]=1;audioInit();if(!e.repeat)onKey(e.code);if(e.code.startsWith('Arrow'))e.preventDefault();});
+addEventListener('keyup',e=>{K[e.code]=0;});
+document.querySelectorAll('[data-key]').forEach(b=>{const k=b.dataset.key,up=()=>{K[k]=0;};
+ b.addEventListener('pointerdown',e=>{e.preventDefault();K[k]=1;try{b.setPointerCapture(e.pointerId);}catch(_){}});
+ b.addEventListener('pointerup',up);b.addEventListener('pointercancel',up);b.addEventListener('lostpointercapture',up);
+ b.addEventListener('contextmenu',e=>e.preventDefault());});
+document.querySelectorAll('[data-act]').forEach(b=>b.addEventListener('click',()=>ACT[b.dataset.act]()));
+let ASPECT='AUTO',RROWS=240,PADON=true; // pads are always drawn (touch detection is unreliable in Tor Browser)
+const boss=document.getElementById('boss'),bossT=document.getElementById('bossT'),bossF=document.getElementById('bossF');
+const UI={hp:'AUTO',hpColor:'#6c6',hold:30}; // settings: hp = AUTO | ALWAYS | OFF; the bar keeps one colour, the state is a text tag
+let lastHp=100,hpHold=0;
+const CMPD=[['N',-Math.PI/2],['E',0],['W',Math.PI],['S',Math.PI/2]]; // north = -y (up on the map), east = +x; P.a = facing angle
+let cmpC=null,cmpX=null,cmpCol='#fff',cmpT=0;
+function drawCompass(){ // N E S W letters only, sliding with the facing direction (240 degrees wide); no frame, no ticks
+ const W=400,H=22,span=Math.PI*4/3,half=span/2,ppr=W/span;
+ if(!cmpC){cmpC=document.createElement('canvas');cmpC.width=W;cmpC.height=H;
+  cmpC.style.cssText='display:block;width:20em;height:1.1em';
+  cmp.textContent='';cmp.appendChild(cmpC);cmpX=cmpC.getContext('2d');}
+ if(cmpT++%30===0)cmpCol=getComputedStyle(cmp).color;
+ const c=cmpX;c.clearRect(0,0,W,H);
+ c.textAlign='center';c.textBaseline='middle';c.shadowColor='#000';c.shadowBlur=4;
+ const L=['N','E','S','W'];
+ for(let i=0;i<4;i++){
+  let d=-Math.PI/2+i*Math.PI/2-P.a;d-=2*Math.PI*Math.round(d/(2*Math.PI));
+  const ad=Math.abs(d);if(ad>=half)continue;
+  const x=W/2+d*ppr,near=1-ad/half;
+  c.globalAlpha=Math.pow(near,0.6);
+  c.fillStyle=i===0?'#e66':cmpCol;
+  c.font='bold '+Math.round(13+7*near)+'px monospace';
+  c.fillText(L[i],x,H/2+1);}
+ c.globalAlpha=1;}
+function drawBar(){if(P.hp!==lastHp)hpHold=UI.hold;lastHp=P.hp;if(hpHold>0)hpHold--;
+ const show=UI.hp==='ALWAYS'||(UI.hp==='AUTO'&&(P.hp<100||hpHold>0));boss.style.display=show?'block':'none';if(!show)return;
+ bossT.textContent='HP '+P.hp+'/100';bossF.style.width=P.hp+'%';bossF.style.background=UI.hpColor;}
+function layout(){const st=document.getElementById('stage'),iw=innerWidth,ih=innerHeight,touch=matchMedia('(pointer:coarse)').matches||navigator.maxTouchPoints>0;
+ const rot=touch&&ih>iw,vw=rot?ih:iw,vh=rot?iw:ih; // portrait phone: rotate the whole UI to landscape (no fullscreen / orientation lock: Tor Browser)
+ const a=ASPECT==='4:3'?4/3:ASPECT==='16:9'?16/9:(PADON&&(vw-vh*4/3)/2>=148?4/3:(vw/vh>=16/9?16/9:4/3)); // 4:3 when the side margins can hold the pads
+ const cw=Math.min(vw,vh*a),ch=cw/a,cols=Math.round(RROWS*a);
+ if(cols!==W||RROWS!==H)setRes(cols,RROWS); // dot size = screen height / rows (relative), not a fixed pixel size
+ PL=0.54*a;PL2=PL*PL;
+ cv.style.width=cw+'px';cv.style.height=ch+'px';
+ st.style.width=vw+'px';st.style.height=vh+'px';st.style.transformOrigin='0 0';st.style.transform=rot?'translate('+iw+'px,0) rotate(90deg)':'none';
+ st.className=(!PADON||(vw-cw)/2>=148)?'out':'over'; // pads: beside the view / over it (translucent)
+ boss.style.fontSize=hud.style.fontSize=cmp.style.fontSize=Math.max(10,12*ch/240)+'px';}
+addEventListener('resize',layout);layout();
+document.getElementById('menuBtn').addEventListener('click',()=>{const m=document.getElementById('menu');m.style.display=m.style.display==='block'?'none':'block';});
+addEventListener('pointerdown',audioInit);
+addEventListener('hashchange',applyHash);addEventListener('keydown',e=>{if(e.code==='KeyV')ENG=!ENG;}); // KeyV: engraving on/off
+applyHash();
+let last=0,fc=0,tMark=0,fMark=0,dtEst=1/60;
+function loop(t){if(!tMark)tMark=t;if(fc-fMark>=30){const d=(t-tMark)/(fc-fMark)/1000;if(d>0)dtEst=Math.min(0.05,Math.max(0.004,d));tMark=t;fMark=fc;}const dt=dtEst;last=t;fc++;
+ update(dt);if(Math.abs(P.x)>8192||Math.abs(P.y)>8192)rebase();const t0=performance.now();syncWindow(P.x,P.y);render();MS=MS*0.9+(performance.now()-t0)*0.1;FPS=FPS*0.95+(1/Math.max(dt,0.001))*0.05;
+ drawCompass();
+ if(mapState&&fc%8===1)drawMap();
+ if(fc%6===0){if(hudOn)drawHud();drawBar();}
+ if(fc%60===0)writeHash();
+ requestAnimationFrame(loop);}
+requestAnimationFrame(loop);
+</script></body></html>
