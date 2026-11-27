@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>OPEN WORLD PROTO gen16 + SWORD + SHIELD + DEMON</title>
+<title>Darkworld</title>
 <style>
 .base{background-color:#000;color:#ccf;user-select:none;-webkit-user-select:none;margin:0;padding:0;font-family:monospace;touch-action:manipulation;overflow:hidden}
 .unit{background-color:#000;color:#ccf;border:solid 1px #ccf;user-select:none;-webkit-user-select:none;margin:2px;padding:2px;font-family:monospace}
@@ -66,7 +66,7 @@ button.unit{font-size:14px}
 <script>
 'use strict';
 /* ===== world contract (do not change without bumping GEN_VERSION) ===== */
-const GEN_VERSION=16, CH=32, RANK='DWSGFCM';
+const GEN_VERSION=17, CH=32, RANK='DWSGFCM';
 let SEED=123456, R0=400, RR=2500;
 const ENVT=4, ENVREC=3; // no heat / cold damage any more; only slow recovery: ENVREC hp every ENVT seconds
 /* ALTITUDE decides the terrain: the height 0..255 is cut into 8 fixed bands (4 classes x 2): 0 deep sea, 1 shallows | 2 sand, 3 lowland grass | 4 highland grass, 5 highland wasteland | 6 mountain wasteland, 7 snowfield.
@@ -97,7 +97,7 @@ function vn(x,y,k,s){const hf=1<<(k-1),sz=1<<k,u=FU+(x-FX)-hf,v=FQ+(y-FY)-hf,gx=
 /* climate 0..255 (128 = temperate): two very large noises (2^13 / 2^11 cells) + height (high = cold). NOT bound to x, y or the distance from the origin. */
 function clim(x,y,t){let n=(179*vn(x,y,13,1)+77*vn(x,y,11,2))>>8;n=Math.min(255,Math.max(0,128+(((n-128)*512)>>8)));return Math.min(255,Math.max(0,n-((t-128)>>2)));}
 const climateAt=(x,y)=>{const ix=Math.floor(x),iy=Math.floor(y);setFrame(ix,iy);return clim(ix,iy,heightT(ix,iy))/255;}; // float view for gameplay/sky only
-function genReset(){SSX=NaN;SSY=NaN;NCV.fill(255);RCV.fill(0);CCV.fill(0);} // origin / seed changed: drop every cache
+function genReset(){SSX=NaN;SSY=NaN;NCV.fill(255);for(const v of CVS)v.fill(0);try{DK.clear();}catch(e){}} // origin / seed changed: drop every cache
 /* mountain caves: a lattice (every 16 cells) of jittered nodes joined by tunnels; edges exist with p=0.65 (> 0.5, so the network percolates and runs through the mountain). Integer only.
    Geometry is computed relative to the lattice cell, so it is independent of the origin. */
 function segD(px,py,ax,ay,bx,by,r2){const dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy,ex=px-ax,ey=py-ay,dot=ex*dx+ey*dy; // is (px,py) within sqrt(r2) of the segment?
@@ -121,33 +121,30 @@ function clump(x,y,k,s,pa,pj,sh){const S=1<<k,rm=(S*3)>>3,rn=((rm*5)/6)|0,jr=S-2
   if(isPar(k,gx,gy+1,s,pa,pj)===2&&segD(qx,qy,cX(gx,gy),cY(gx,gy),cX(gx,gy+1),cY(gx,gy+1)+S,rb))return 1;}
  return 0;}
 const lavaMt=(px,py)=>hlat(9,Math.floor(px/512),Math.floor(py/512),60)>=140; // LAVA mountain (about 45 %) or plain CAVE mountain: decided per 512x512 square, which lines up with the clump lattice
-/* CAVE INTERIOR = 8x8 tile patterns (4x4 tiles make one 32x32 chunk). Every pattern keeps floor in the middle of all four edges (2 cells each), so any two neighbouring tiles connect and the whole cave is one network.
-   . floor  # rock mass  P pillar  ~ shallow liquid  O deep liquid. The pattern of a tile comes from the tile's lattice hash (lattice every 8 cells) through a weight table. */
+/* CAVE INTERIOR = 8x8 tile patterns, 4x4 tiles = one 32x32 chunk. The patterns are deliberately LOPSIDED (no mirror symmetry) and every tile is turned to north / east / south / west by its hash,
+   so a few designs give many different looks. Every pattern keeps floor in the middle of all four edges (2 cells each), which survives any turn: neighbouring tiles always connect, the cave is one network.
+   . floor  # rock mass  P pillar. Pools are not tiles: they are the contour lines of a value noise laid over the floor (irregular blobs, a shallow rim around a deep middle). */
 const TPAT=[
- ["........","........","........","........","........","........","........","........"], // 0 open hall
- ["##....##","##....##","........","........","........","........","##....##","##....##"], // 1 four corner blocks (cross-shaped passage)
- ["........","........","..####..","..####..","..####..","..####..","........","........"], // 2 ring passage around a rock mass
- ["........","........","..P..P..","........","........","..P..P..","........","........"], // 3 four pillars
- ["........","........","........","...PP...","...PP...","........","........","........"], // 4 centre pillar block
- ["........",".P..P...","........","........",".P..P...","........","........","........"], // 5 pillar lattice (3 cells)
- ["........","........","..~~~~..","..~OO~..","..~OO~..","..~~~~..","........","........"], // 6 pool
- ["##......","#.......","........","........","........","........",".......#","......##"], // 7 rocks top-left / bottom-right
- ["......##",".......#","........","........","........","........","#.......","##......"], // 8 rocks top-right / bottom-left
- ["###.....","###.....","###.....","........","........","....P...","........","........"]  // 9 big corner block + one pillar
-],TW_CAVE=[0,0,1,2,3,3,4,5,5,6,7,8,9,3,5,4],TW_LAVA=[0,0,0,0,1,2,6,6,6,6,7,8,9,3],TPC=TPAT.map(t=>t.map(r=>Array.from(r,c=>c==='.'?1:c==='#'?0:c==='P'?4:c==='~'?2:3)));
+ ["###.....","###.....","##......","........","........","........","........","........"], // 0 mass in the north-west corner
+ [".P......","........","........","........","........",".....###",".....###","......##"], // 1 mass in the south-east corner + a pillar
+ ["##...###","#.....##","#.......","........","........","........","........","........"], // 2 two masses of different size at the north edge
+ ["........",".P....P.","........","..P.....",".....P..","........",".P......","........"], // 3 scattered pillars
+ ["........","........","........","........","........","#.......","##......","###....."], // 4 ramp in the south-west corner
+ ["........","........","..###...","..###...","........","........","......P.","........"], // 5 off-centre island + a pillar
+ ["......##","......##",".......#","........","........","...P....","........","........"], // 6 wall piece at the east edge + a pillar
+ ["........","........","........","........","....P...","........","........","........"], // 7 one pillar, off-centre
+ ["###.....","#.......","........","........","........","........","......#.","......##"]  // 8 two unequal corner masses
+],TW=[0,1,2,3,3,4,5,6,7,8,7,3],TPC=TPAT.map(t=>t.map(r=>Array.from(r,c=>c==='.'?1:c==='#'?0:4))),POOL1=192,POOL2=199;
+function tileC(px,py){const tx=Math.floor(px/8),ty=Math.floor(py/8),lx=px-tx*8,ly=py-ty*8,r=hlat(3,tx,ty,102)&3;
+ let u=lx,v=ly;if(r===1){u=ly;v=7-lx;}else if(r===2){u=7-lx;v=7-ly;}else if(r===3){u=7-ly;v=lx;} // turn the tile
+ return TPC[TW[(hlat(3,tx,ty,101)*TW.length)>>8]][v][u];}
+const poolQ=(x,y)=>(3*vn(x,y,4,61)+vn(x,y,3,62))>>2;
 function cave(x,y,a){ // 0 wall, 1 floor, 2 shallow liquid (walkable), 3 deep liquid (impassable), 4 pillar
- const px=FU+(x-FX),py=FQ+(y-FY),tx=Math.floor(px/8),ty=Math.floor(py/8),lx=px-tx*8,ly=py-ty*8,tw=lavaMt(px,py)?TW_LAVA:TW_CAVE;
- return TPC[tw[(hlat(3,tx,ty,101)*tw.length)>>8]][ly][lx];}
-function okLand(x,y){const l=ninfo(x,y)&7;return l>=2&&l<=5;}
-/* ENTRANCE GATE: in front of a cave entrance E (outward direction d) a roofed stone passage: floor on E+d and E+2d, stone walls on both sides. A third of the entrances get one. */
-let GD=0;
-function gateAt(x,y){ // is (x,y) a cell of an entrance gate? 0 none, 2 passage floor (roofed), 6 stone wall, 4 clearing at the exit (no objects). Two passes: a passage floor always wins over a neighbouring gate's wall, so no entrance is sealed
- for(let pass=0;pass<2;pass++)for(let d=0;d<4;d++){const dx=NDX[d],dy=NDY[d];
-  for(let k=1;k<=3;k++)for(let s=-1;s<=1;s++){if((s===0)!==(pass===0)||(k===3&&s!==0))continue;const ex=x-dx*k+dy*s,ey=y-dy*k-dx*s; // cell = E + k*d + s*p, p = (-dy,dx)
-   if((ninfo(ex,ey)&7)!==6)continue;const hg=hsh(ex,ey,43)<96; // about a third of the doorways get a gate; a doorway in a flat wall (no natural pocket) always does
-   if(!okLand(ex+dx,ey+dy)||!okLand(ex+2*dx,ey+2*dy)||!okLand(ex+3*dx,ey+3*dy))continue; // 3 cells of dry open ground in front of the entrance
-   if(gateK(ex,ey,true)===1&&GD===d){if(!hg){let sc=0;for(let q=0;q<8;q++)if((ninfo(ex+dx+NDX[q],ey+dy+NDY[q])&7)===6)sc++;if(sc>=5)continue;}return k===3?4:pass===0?2:6;}}}
- return 0;}
+ const px=FU+(x-FX),py=FQ+(y-FY);let c=tileC(px,py);
+ if(c===1){const q=poolQ(x,y);if(q>=POOL1){c=2;if(q>=POOL2){let ok=true; // deep only where all 8 neighbours are liquid floor too: a deep middle always has a shallow rim, so it can never cut a route
+   for(let k=0;k<8&&ok;k++)if(tileC(px+NDX[k],py+NDY[k])!==1||poolQ(x+NDX[k],y+NDY[k])<POOL1)ok=false;
+   if(ok)c=3;}}}
+ return c;}
 const AREAC=c=>(c&7)===6||((c&7)<=4&&(c&192)===128&&!(c&8)); // INSIDE: a cave, or a roofed building floor (bit 7 without bit 6). Inside = ceiling texture, outside = sky
 let SC=0,SV=0,SO=0,FAST=false;
 /* cell code: bits0-2 letter (D W S G T R M), bit3 wall, bits4-5 special (1 ice, 2 lava), bit6 ENTRANCE, bit7 PILLAR (a wall cell inside a cave).
@@ -170,97 +167,67 @@ function terr(x,y){setFrame(x,y);const t=heightT(x,y),c=clim(x,y,t); // DEMON RE
    ob=h<(gv?(s?90:75):(s?34:20))?3:h<80+((100*d)>>8)?gt:h>=248?4:0;}} // withered (lower) and conifer (upper) forest
  else if(!sp&&l<=1){const h=hsh(x,y,9);ob=l===1?(clump(x,y,5,110,215,160,0)?(h<70?2:h<125?(vn(x,y,4,10)>140?5:1):0):(h<8?2:0)):(h<5?2:0);} // SWAMP = wetland: thorny dead branches (2) and dead reeds stand out of the shallow bog in clumps, a few in the deep swamp (objects never block, so you can wade through)
  TL=l;TSP=sp;TOB=ob;TC=c;TPOS=pos;TIDXI=idx;return l;}
-/* AREA size rule: a mountain is a cave only where it is big enough to hold a floor under a ceiling.
-   core = cell whose (2*CR+1)^2 neighbourhood is all mountain; cave cell = mountain cell within CR of a core. Smaller mountain bits (1 cell ... thin ridges) become a single brown boulder on rock ground (no ceiling). */
-const CR=3,RCX=new Int32Array(65536),RCY=new Int32Array(65536),RCV=new Uint8Array(65536),CCX=new Int32Array(65536),CCY=new Int32Array(65536),CCV=new Uint8Array(65536);
-function isMtn(x,y){const i=(Math.imul(x,73856093)^Math.imul(y,19349663))>>>16;if(RCV[i]&&RCX[i]===x&&RCY[i]===y)return RCV[i]===2;
- const m=terr(x,y)===6;RCX[i]=x;RCY[i]=y;RCV[i]=m?2:1;return m;}
-function coreAt(x,y){const i=(Math.imul(x,19349663)^Math.imul(y,83492791))>>>16;if(CCV[i]&&CCX[i]===x&&CCY[i]===y)return CCV[i]===2;
- let ok=true;for(let dy=-CR;dy<=CR&&ok;dy++)for(let dx=-CR;dx<=CR;dx++)if(!isMtn(x+dx,y+dy)){ok=false;break;}
- CCX[i]=x;CCY[i]=y;CCV[i]=ok?2:1;return ok;}
-function caveCell(x,y){for(let dy=-CR;dy<=CR;dy++)for(let dx=-CR;dx<=CR;dx++)if(coreAt(x+dx,y+dy))return true;return false;}
-/* neighbour probe (cached): letter (6 only for cave mountain; small mountain bits count as rock = outside) | passable-object<<3. Passable = an obstacle without collision: tall tree (clear underneath) or small rock */
+/* CAVE RULE: a mountain cell is a CAVE cell when it lies inside some 8x8 block (= the pattern size) that is mountain all over. Smaller mountain bits are solid rock (wall).
+   Four cached levels (row of 8 -> block of 8x8 -> dilate along x -> dilate along y), every level looks at 8 cells of the level below. */
+const CVS=[];
+function mkCache(f){const X=new Int32Array(65536),Y=new Int32Array(65536),V=new Uint8Array(65536);CVS.push(V);
+ return (x,y)=>{const i=(Math.imul(x,19349663)^Math.imul(y,83492791))>>>16;if(V[i]&&X[i]===x&&Y[i]===y)return V[i]===2;const r=f(x,y);X[i]=x;Y[i]=y;V[i]=r?2:1;return r;};}
+const isMtn=mkCache((x,y)=>terr(x,y)===6),
+ rowFull=mkCache((x,y)=>{for(let i=0;i<8;i++)if(!isMtn(x+i,y))return false;return true;}),
+ blkFull=mkCache((x,y)=>{for(let j=0;j<8;j++)if(!rowFull(x,y+j))return false;return true;}),
+ rowCave=mkCache((x,y)=>{for(let i=0;i<8;i++)if(blkFull(x-i,y))return true;return false;}),
+ caveCell=mkCache((x,y)=>{for(let j=0;j<8;j++)if(rowCave(x,y-j))return true;return false;});
+/* neighbour probe (cached): terrain letter | passable-object<<3 (tall tree / small rock = an obstacle without collision) */
 const NCX=new Int32Array(65536),NCY=new Int32Array(65536),NCV=new Uint8Array(65536).fill(255);
 function ninfo(x,y){const i=(Math.imul(x,73856093)^Math.imul(y,19349663))>>>16;
  if(NCX[i]===x&&NCY[i]===y&&NCV[i]!==255)return NCV[i];
- const l0=terr(x,y),ob=TOB;let l=l0,p=0;
- if(l0===6){if(!caveCell(x,y)){l=5;p=(hsh(x,y,9)<141&&(hsh(x,y,8)>>4)<10)?1:0;}} // rock state: small rocks are passable obstacles
- else if(ob===3||ob===4){const v=hsh(x,y,8)>>4;p=((ob===3&&v>=7)||(ob===4&&v<10))?1:0;}
+ const l=terr(x,y),ob=TOB;let p=0;
+ if(l!==6&&(ob===3||ob===4)){const v=hsh(x,y,8)>>4;p=((ob===3&&v>=7)||(ob===4&&v<10))?1:0;}
  const r=l|(p<<3);NCX[i]=x;NCY[i]=y;NCV[i]=r;return r;}
-const NDX=[1,-1,0,0,1,1,-1,-1],NDY=[0,0,1,-1,1,-1,1,-1],GL=10; // 4 cardinal + 4 diagonal; entrance corridor length
-/* ENTRANCE: a mountain edge cell whose outer neighbour is a passable obstacle (tall tree / small rock) is opened, and a straight corridor of GL cells leads inward.
-   returns 1 = the entrance cell itself, 2 = corridor cell, 0 = none. per4 = this cell touches the outside (4-neighbour), so it cannot be a corridor cell */
-function flatFace(ex,ey,dx,dy){const px=-dy,py=dx; // ONE flat face: the entrance row has mountain 2 cells to each side, the row in front has none -> the doorway sits in a straight wall (no staircase corner, no second visible face)
- for(let s=1;s<=2;s++)for(let sg=-1;sg<=1;sg+=2){if((ninfo(ex+px*s*sg,ey+py*s*sg)&7)!==6)return false;if((ninfo(ex+dx+px*s*sg,ey+dy+py*s*sg)&7)===6)return false;}
- return true;}
-/* CAVE ENTRANCES by chunk (32x32 cells). Mountain outline = the cell noise as before; chunks only decide WHERE a doorway goes.
-   1. a chunk is a mountain chunk when >= 6 of 64 sample cells are cave cells; its OUTER faces are the sides whose neighbour chunk is not a mountain chunk (never a connecting side)
-   2. a chunk gets at most ONE doorway, on one outer face: open faces first (nothing mountain 2 chunks beyond), the start face rotates with the chunk coordinates, and two connected chunks never pick the same face
-   3. in a larger mass (3x3 neighbourhood > 2 mountain chunks) only the chunk with the lowest hash among the outer chunks around it opens a doorway: the count follows the outline length, not the area
-   4. every region (32x32 chunks) gets one doorway on each of N / E / S / W: the outermost chunk on that side is forced
-   5. inside the chunk the doorway is a cell of the outline facing that face, in the most concave place (walls on both sides, pocket in front) so only that one face shows it, and a corridor leads to the tunnels */
-const CHC=new Map(),RGC=new Map();
-const chKey=(gx,gy)=>FSX+'|'+FSY+'|'+gx+'|'+gy,chOrg=(gx,gy)=>[FX+(gx*32-FU),FY+(gy*32-FQ)],chHash=(gx,gy)=>hlat(5,gx,gy,110);
-function chMass(gx,gy){const k=chKey(gx,gy);let c=CHC.get(k);if(c)return c;
- const o=chOrg(gx,gy);let m=0;for(let j=0;j<8;j++)for(let i=0;i<8;i++)if((ninfo(o[0]+i*4+2,o[1]+j*4+2)&7)===6)m++;
- if(CHC.size>30000)CHC.clear();c={m,M:m>=6,ent:undefined};CHC.set(k,c);return c;}
-const isM=(gx,gy)=>chMass(gx,gy).M,outerD=(gx,gy,d)=>!isM(gx+NDX[d],gy+NDY[d]);
-function regionForce(gx,gy){const rx=Math.floor(gx/32),ry=Math.floor(gy/32),rk=FSX+'|'+FSY+'|R'+rx+'|'+ry;let r=RGC.get(rk);
- if(!r){r=new Map();const list=[],used=new Set();
-  for(let j=0;j<32;j++)for(let i=0;i<32;i++){const cx=rx*32+i,cy=ry*32+j;if(isM(cx,cy))list.push([cx,cy]);}
-  for(const d of [3,0,2,1]){let best=null,bs=-1e18;for(const c of list){const ck=chKey(c[0],c[1]);if(used.has(ck)||!outerD(c[0],c[1],d))continue;
-    const sc=(d===3?-c[1]:d===2?c[1]:d===0?c[0]:-c[0])*1000+(255-chHash(c[0],c[1]))/1000;if(sc>bs){bs=sc;best=c;}}
-   if(best){const ck=chKey(best[0],best[1]);used.add(ck);r.set(ck,d);}}
-  if(RGC.size>2000)RGC.clear();RGC.set(rk,r);}
- const f=r.get(chKey(gx,gy));return f===undefined?-1:f;}
-function faceOrder(gx,gy){const out=[],s=(gx+2*gy)&3;for(let i=0;i<4;i++){const d=(s+i)&3;if(outerD(gx,gy,d))out.push(d);}
- const op=out.filter(d=>!isM(gx+2*NDX[d],gy+2*NDY[d])),cl=out.filter(d=>isM(gx+2*NDX[d],gy+2*NDY[d]));return op.concat(cl);}
-function findDoor(gx,gy,d){const o=chOrg(gx,gy),dx=NDX[d],dy=NDY[d],px=-dy,py=dx,cand=[];
- for(let j=0;j<32;j++)for(let i=0;i<32;i++){const ex=o[0]+i,ey=o[1]+j;if((ninfo(ex,ey)&7)!==6)continue;
-  const ox=ex+dx,oy=ey+dy,n=ninfo(ox,oy);if((n&7)===6||!(n&8)||!okLand(ox,oy))continue; // the cell in front: dry land with a passable object
-  if((ninfo(ex+px,ey+py)&7)!==6||(ninfo(ex-px,ey-py)&7)!==6||(ninfo(ex-dx,ey-dy)&7)!==6)continue; // walls on both sides, rock behind: a single face
-  let sc=0;for(let k=0;k<8;k++)if((ninfo(ox+NDX[k],oy+NDY[k])&7)===6)sc++; // concavity of the cell in front (flat wall 3, pocket 5)
-  cand.push([sc,((ex*73856093)^(ey*19349663))>>>0,ex,ey]);}
- cand.sort((p,q)=>q[0]-p[0]||p[1]-q[1]);
- for(let t=0;t<Math.min(cand.length,12);t++){const c=cand[t];setFrame(c[2],c[3]);const L=gateLen(c[2],c[3],dx,dy);if(L>0)return {d,L,px:FU,py:FQ,sc:c[0]};}
- return null;}
-function chEnt(gx,gy){const c=chMass(gx,gy);if(c.ent!==undefined)return c.ent;c.ent=null;if(!c.M)return null;
- let faces=faceOrder(gx,gy);if(!faces.length)return null;
- const fd=regionForce(gx,gy);
- if(fd>=0)faces=[fd].concat(faces.filter(d=>d!==fd));
- else{let cnt=0;for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++)if(isM(gx+i,gy+j))cnt++;
-  if(cnt>2){const h=chHash(gx,gy);for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++){if(!i&&!j)continue;const nx=gx+i,ny=gy+j;if(!isM(nx,ny))continue;
-    let ho=false;for(let d=0;d<4;d++)if(outerD(nx,ny,d))ho=true;if(!ho)continue;const h2=chHash(nx,ny);if(h2<h||(h2===h&&(ny<gy||(ny===gy&&nx<gx))))return null;}}
-  const pf=faces[0];for(let d=0;d<4;d++)if(!outerD(gx,gy,d)){const nx=gx+NDX[d],ny=gy+NDY[d],nf=faceOrder(nx,ny)[0];if(nf===pf&&chHash(nx,ny)<chHash(gx,gy)&&faces.length>1){faces=faces.slice(1).concat(pf);break;}}} // a connected neighbour with the same first choice and a lower hash takes it
- let first=null;for(const d of faces){const e=findDoor(gx,gy,d);if(!e)continue;if(e.sc>=5||d===fd){c.ent=e;return e;}if(!first)first=e;} // a pocket (score 5) wins; otherwise the first flat doorway
- if(first)c.ent=first;return first;}
-function entrance(ex,ey,d,fx,fy){setFrame(ex,ey);const gx=Math.floor(FU/32),gy=Math.floor(FQ/32),apx=FU,apy=FQ,e=chEnt(gx,gy);setFrame(fx,fy);
- return e&&e.d===d&&e.px===apx&&e.py===apy?e.L:0;}
-function gateK(x,y,per4){
- for(let d=0;d<4;d++){const dx=NDX[d],dy=NDY[d]; // d = outward direction, the corridor runs the opposite way
-  for(let k=0;k<=GL;k++){
-   if(k>0){if(per4)break;if((ninfo(x+dx*k,y+dy*k)&7)!==6)break;}
-   const ex=x+dx*k,ey=y+dy*k,n=ninfo(ex+dx,ey+dy);
-   if((n&7)!==6&&(n&8)){const L=entrance(ex,ey,d,x,y);if(L>0&&k<=L){GD=d;return k===0?1:2;}}}} // only gates whose corridor reaches the tunnel network
- return 0;}
-function gateLen(ex,ey,dx,dy){for(let j=1;j<=GL;j++){const cx=ex-dx*j,cy=ey-dy*j;
- for(let k=0;k<4;k++)if((ninfo(cx+NDX[k],cy+NDY[k])&7)!==6)return 0; // the corridor must not run along the outside edge
- {const cv=cave(cx,cy,96);if(cv&&cv!==4)return j;}}return 0;} // first inward cell that touches a tunnel
-function sample(x,y){terr(x,y);const l=TL,sp=TSP,ob=TOB,c=TC,tpos=TPOS,tidx=TIDXI;
+const NDX=[1,-1,0,0,1,1,-1,-1],NDY=[0,0,1,-1,1,-1,1,-1]; // 4 cardinal + 4 diagonal
+/* ENTRANCES = a fixed grid of lines. Every DS cells (64) a row and a column runs through the world (one jittered row / column per band). Where a line meets the edge of a cave, a doorway is stamped:
+   rows give east / west doors, columns north / south doors, and the side alternates from band to band. The doorway is always the same shape (4 orientations), so it always shows ONE face:
+   a = steps outward along the door direction (0 = the doorway cell), lat = sideways offset
+     a=0   lat 0 doorway floor (entrance bit) | lat 1 wall                       a=-1..-3 lat 0 corridor floor | lat 1 wall (1-wide corridor)
+     a=-4..-6 lat 0..1 clearing floor (3x3)                                     a=+1 lat 0 clear land | lat 1 rock post outside (the pocket)    a=+2 lat 0 clear land
+   A stamp is placed where the line meets a mountain edge cell with dry land in front and a 3x3 block of cave cells lies right behind the clearing. The stamp overwrites whatever is there (solid rock rim included, a ragged edge beside the corridor does not matter). */
+const DS=64,DK=new Map(),lineAt=(kb,s)=>kb*DS+12+((hlat(6,kb,s,70)*(DS-24))>>8),okLand=(x,y)=>{const l=ninfo(x,y)&7;return l>=2&&l<=5;};
+function doorOK(ex,ey,dx,dy,key){let v=DK.get(key);if(v!==undefined)return v;
+ v=isMtn(ex,ey)&&!isMtn(ex+dx,ey+dy)&&okLand(ex+dx,ey+dy); // doorway = a mountain edge cell with dry land in front
+ for(let a=-1;a>=-6&&v;a--)if(!isMtn(ex+a*dx,ey+a*dy))v=false; // the corridor line and the clearing centre run through the mountain
+ if(v){const tx=ex-7*dx,ty=ey-7*dy; // the cell right behind the clearing must be open floor of the real cave (not a rim wall, not a pattern rock): then the clearing joins the cave network
+  for(let k=0;k<8&&v;k++)if(!caveCell(tx+NDX[k],ty+NDY[k]))v=false;
+  if(v&&!caveCell(tx,ty))v=false;
+  if(v){setFrame(tx,ty);const c=cave(tx,ty,0);if(c!==1&&c!==2)v=false;}}
+ if(DK.size>60000)DK.clear();DK.set(key,v);return v;}
+function doorStamp(x,y){const px=FU+(x-FX),py=FQ+(y-FY),fs=FSX+'|'+FSY+'|';let dirty=false,res=0;
+ for(let o=0;o<2&&!res;o++){const c=o?px:py,k0=Math.floor((c-2)/DS),k1=Math.floor((c+2)/DS);
+  for(let kb=k0;kb<=k1&&!res;kb++){const L=lineAt(kb,o?73:71),lat=c-L;if(lat<-2||lat>2)continue;
+   const sg=(kb&1)?1:-1,dx=o?0:sg,dy=o?sg:0,al=lat<0?-lat:lat;
+   for(let a=-6;a<=2&&!res;a++){
+    const t=a===0?(al===0?1:al===1?3:0):a<0?(a>=-3?(al===0?2:al===1?3:0):(al<=1?2:0)):a===1?(al===0?5:al===1?4:0):(al===0?5:0);if(!t)continue;
+    const ex=o?x-lat:x-a*dx,ey=o?y-a*dy:y-lat,along=o?px-lat-a*dx:py-lat-a*dy, // E lies on the line; 'along' = its coordinate along the line
+     key=fs+o+'|'+kb+'|'+(o?px-lat:px-a*dx)+'|'+(o?py-a*dy:py-lat);
+    if(DK.has(key)?DK.get(key):(dirty=true,doorOK(ex,ey,dx,dy,key)))res=t;}}}
+ if(dirty)setFrame(x,y);return res;}
+function sample(x,y){terr(x,y);const l=TL,sp=TSP,ob=TOB,c=TC,tpos=TPOS;
  let w=0,sv=-1,fl=0,so=ob,spx=sp;
- let cf=0;if(l<=5&&!FAST&&tidx){cf=gateAt(x,y);setFrame(x,y);} // structures: only on land; on water only the road (a bridge)
+ const ds=FAST?0:doorStamp(x,y);
+ if(ds===3||ds===4){SO=0;SC=c;SV=hsh(x,y,8);return 6|8;} // rock wall of a doorway stamp: beside the corridor (3) or a post outside (4)
+ if(ds===5||ds===2)so=0; // clear land in front of a doorway / nothing blocks the corridor
  if(l===6){const bs=48,be=64,dI=Math.min(tpos-bs,be-tpos),e=Math.min(255,(dI/Math.max(0.5,Math.min((be-bs)/2,2.56))*255)|0),hl=Math.min(255,Math.max(0,128+(((150*vn(x,y,5,50)+106*vn(x,y,3,51))>>8)-128)*2)),a=(hl*e)>>8;sv=a; // height: low at the foot, hills inside
-  if(!FAST&&!caveCell(x,y)){SO=clump(x,y,4,110,235,150,0)&&hsh(x,y,9)<150?4:0;SC=c;SV=hsh(x,y,8);return 5|64;} // too small for a cave: ROCK state = same floor, big (blocking) and small (passable) brown rocks
-  let per=false,per4=false,g=0;
-  if(!FAST){for(let k=0;k<8;k++)if((ninfo(x+NDX[k],y+NDY[k])&7)!==6){per=true;if(k<4)per4=true;}g=gateK(x,y,per4);}
-  if(g){w=0;if(g===1)fl=1;} // entrance / corridor: floor
-  else if(per)w=1; // boundary of the AREA: wall
-  else{const cv=cave(x,y,a);if(!cv)w=1;else{w=0;
-   if(cv===4){w=1;fl=2;} // pillar (from the tile pattern)
-   else if(cv>1){spx=lavaMt(FU+(x-FX),FQ+(y-FY))?2:3;if(cv===3)fl|=2;} // liquid in the pools: magma zones (~a fifth of the liquids), water elsewhere; deep (bit 7) = impassable
-   else{const h2=hsh(x,y,40);if(h2>=236){so=4;sv=(hsh(x,y,8)*160)>>8;}}}}}
- if(cf){so=0;if(cf===1)fl=1;else if(cf===2)fl=2;else if(cf===3){w=1;fl=2;}else if(cf===5)fl=3;else if(cf===6){w=1;fl=3;}} // bit 7 = building, bit 6 = road, both = open yard (floor) / stone wall (wall) // bit 6 = road (letters 1-4), bit 7 = building (wall if w, floor otherwise)
- SO=so;SC=c;SV=sv>=0?sv:hsh(x,y,8);return l|(w<<3)|(spx<<4)|(fl<<6);}
+  if(ds===1){w=0;fl=1;so=0;} // doorway
+  else if(ds===2){w=0;so=0;} // corridor / clearing
+  else if(!FAST&&!caveCell(x,y))w=1; // solid rock: smaller than the 8x8 pattern
+  else{let per=false;
+   if(!FAST){for(let k=0;k<8;k++)if(!caveCell(x+NDX[k],y+NDY[k])){per=true;break;}}
+   if(per)w=1; // boundary of the cave: wall
+   else{const cv=cave(x,y,a);if(!cv)w=1;else{w=0;
+    if(cv===4){w=1;fl=2;} // pillar (from the tile pattern)
+    else if(cv>1){spx=lavaMt(FU+(x-FX),FQ+(y-FY))?2:3;if(cv===3)fl|=2;} // pool: magma in lava mountains, water elsewhere; deep (bit 7) = impassable
+    else{const h2=hsh(x,y,40);if(h2>=236){so=4;sv=(hsh(x,y,8)*160)>>8;}}}}}}
+ SC=c;
+ SO=so;SV=sv>=0?sv:hsh(x,y,8);return l|(w<<3)|(spx<<4)|(fl<<6);}
 /* ===== window: same mechanism as BLACKMAGIC SYNC_WINDOW (64x64 torus around the player, entering rows/columns only) ===== */
 const WS=64,WIN={code:new Uint8Array(4096),cb:new Uint8Array(4096),vb:new Uint8Array(4096),ob:new Uint8Array(4096),ox:0,oy:0,ready:false};
 function winWrite(x,y){const k=((y&63)<<6)|(x&63);WIN.code[k]=sample(x,y);WIN.cb[k]=SC;WIN.vb[k]=SV;WIN.ob[k]=SO;}
